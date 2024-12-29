@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Verwerking Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+    <div class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
+        <h1 class="text-2xl font-bold mb-6">PDF Verwerking Tool</h1>
+        <a 
+  class="text-red-500 text-xs font-bold my-4 block" 
+  href="PDF_Verwerking_Tool_Handleiding.pdf" 
+  download
+>
+  Klik hier om de handleiding te downloaden
+</a>
+
+
+        
+        <form id="uploadForm" class="space-y-6">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">
+                    Selecteer PDF bestand
+                </label>
+                <input type="file" 
+                       name="file" 
+                       accept=".pdf"
+                       class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700">
+                    Te verwijderen pagina's
+                </label>
+                <input type="text" 
+                       name="remove_pages" 
+                       placeholder="bijv. 5,6,13,33,34"
+                       class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700">
+                    Artikelbereiken
+                </label>
+                <input type="text" 
+                       name="article_ranges" 
+                       placeholder="bijv. 1-3,4-8,8-9"
+                       class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700">
+                    Artikelen combineren (optioneel)
+                </label>
+                <p class="text-sm text-gray-500 mb-2">
+                    Voer twee paginanummers in om te combineren (bijv. "4,6")
+                </p>
+                <input type="text" 
+                       name="merge_pages" 
+                       placeholder="bijv. 4,6"
+                       pattern="\d+,\d+"
+                       class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+            </div>
+
+            <button type="submit" 
+                    class="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors">
+                Uploaden en Verwerken
+            </button>
+        </form>
+
+        <div id="status" class="mt-6 hidden">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+            <p class="text-center mt-2">Bestand wordt verwerkt...</p>
+        </div>
+
+        <div id="result" class="mt-6 hidden">
+            <h2 class="text-lg font-semibold mb-2">Verwerkingsresultaten:</h2>
+            <ul id="outputList" class="list-disc pl-5 space-y-2"></ul>
+        </div>
+    </div>
+
+    <!-- index.html script bölümünü güncelle -->
+<script>
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const status = document.getElementById('status');
+        const result = document.getElementById('result');
+        const outputList = document.getElementById('outputList');
+        
+        status.classList.remove('hidden');
+        result.classList.add('hidden');
+        outputList.innerHTML = '';
+        
+        const formData = new FormData(e.target);
+
+        try {
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                const resultMessage = document.createElement('li');
+                resultMessage.innerHTML = `
+                    Verwerking voltooid. Bestanden zijn opgeslagen in:<br>
+                    <span class="font-mono text-sm">${data.outputPath}</span>
+                `;
+                outputList.appendChild(resultMessage);
+                result.classList.remove('hidden');
+            } else {
+                alert(`Fout: ${data.error}`);
+            }
+        } catch (error) {
+            alert('Er is een fout opgetreden bij het verwerken van het bestand.');
+        } finally {
+            status.classList.add('hidden');
+        }
+    });
+</script>
+</body>
+</html>
