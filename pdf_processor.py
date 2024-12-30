@@ -7,12 +7,11 @@ import pytesseract
 import logging
 import tempfile
 from typing import List, Dict, Optional, Tuple, Union
+from pathlib import Path
 
 
 class PDFProcessor:
-    def __init__(self, upload_dir: str, output_dir: str):
-        self.upload_dir = upload_dir
-        self.output_dir = output_dir
+    def __init__(self):
         self.setup_tesseract()
 
     @staticmethod
@@ -24,36 +23,51 @@ class PDFProcessor:
             pytesseract.pytesseract.tesseract_cmd = os.getenv(
                 'TESSERACT_PATH', 'tesseract')
 
-    def setup_logging(self, base_output_path: str) -> logging.Logger:
-        """Logging yapılandırması"""
-        log_dir = os.path.join(base_output_path, 'log')
-        os.makedirs(log_dir, exist_ok=True)
+    def get_downloads_folder(self) -> Path:
+        """Kullanıcının Downloads klasörünü tespit et"""
+        home = Path.home()
+        if os.name == 'nt':  # Windows
+            downloads = home / 'Downloads'
+        elif os.name == 'posix':  # macOS ve Linux
+            downloads = home / 'Downloads'
+        else:
+            downloads = home / 'Downloads'
 
-        log_filename = f"log-{datetime.now().strftime('%y%m%d')}.txt"
-        log_path = os.path.join(log_dir, log_filename)
+        downloads.mkdir(parents=True, exist_ok=True)
+        return downloads
+
+    def create_output_folders(self, output_name: str) -> Path:
+        """Çıktı klasörlerini Downloads içinde oluştur"""
+        downloads = self.get_downloads_folder()
+        base_path = downloads / f"output{output_name}"  # Tire kaldırıldı
+        folders = ['pdf', 'ocr', 'small', 'large', 'log']
+
+        for folder in folders:
+            folder_path = base_path / folder
+            folder_path.mkdir(parents=True, exist_ok=True)
+
+        return base_path
+
+    def setup_logging(self, base_output_path: Path) -> logging.Logger:
+        """Logging yapılandırması"""
+        log_dir = base_output_path / 'log'
+        log_dir.mkdir(exist_ok=True)
+
+        log_filename = f"log{datetime.now().strftime(
+            '%y%m%d')}.txt"  # Tire kaldırıldı
+        log_path = log_dir / log_filename
 
         logging.basicConfig(
-            filename=log_path,
+            filename=str(log_path),
             level=logging.INFO,
             format='%(asctime)s - %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S'
         )
         return logging.getLogger()
 
-    def create_output_folders(self, output_name: str) -> str:
-        """Çıktı klasörlerini oluştur"""
-        base_path = os.path.join(self.output_dir, f"output_{output_name}")
-        folders = ['pdf', 'ocr', 'small', 'large', 'log']
-
-        for folder in folders:
-            folder_path = os.path.join(base_path, folder)
-            os.makedirs(folder_path, exist_ok=True)
-
-        return base_path
-
     @staticmethod
     def generate_filename(year: str, number: str, start_page: int, end_page: int) -> str:
-        """Standart dosya adı oluştur"""
+        """Standart dosya adı oluştur - tire olmadan"""
         return f"{year}{str(number).zfill(2)}{str(start_page).zfill(2)}{str(end_page).zfill(2)}"
 
     def process_pdf(self, input_pdf: str, pages_to_remove: List[int] = None,
@@ -241,7 +255,7 @@ class PDFProcessor:
         return outputs
 
     def _save_outputs(self, writer: PdfWriter, file_base_name: str,
-                      base_path: str, logger: logging.Logger) -> Dict[str, List[str]]:
+                      base_path: Path, logger: logging.Logger) -> Dict[str, List[str]]:
         """PDF, görüntü ve OCR çıktılarını kaydet"""
         outputs = {
             'pdf': [],
@@ -253,10 +267,10 @@ class PDFProcessor:
         temp_path = None
         try:
             # PDF kaydet
-            pdf_path = os.path.join(base_path, 'pdf', f"{file_base_name}.pdf")
+            pdf_path = base_path / 'pdf' / f"{file_base_name}.pdf"
             with open(pdf_path, 'wb') as pdf_file:
                 writer.write(pdf_file)
-            outputs['pdf'].append(pdf_path)
+            outputs['pdf'].append(str(pdf_path))
 
             # Geçici dosya oluştur
             with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_pdf:
@@ -269,26 +283,23 @@ class PDFProcessor:
                 first_image = images[0]
 
                 # Küçük resim kaydet
-                small_path = os.path.join(
-                    base_path, 'small', f"{file_base_name}.jpg")
+                small_path = base_path / 'small' / f"{file_base_name}.jpg"
                 small_image = first_image.copy()
                 small_image.thumbnail((800, 800))
-                small_image.save(small_path, 'JPEG')
-                outputs['small'].append(small_path)
+                small_image.save(str(small_path), 'JPEG')
+                outputs['small'].append(str(small_path))
 
                 # Büyük resim kaydet
-                large_path = os.path.join(
-                    base_path, 'large', f"{file_base_name}.jpg")
-                first_image.save(large_path, 'JPEG')
-                outputs['large'].append(large_path)
+                large_path = base_path / 'large' / f"{file_base_name}.jpg"
+                first_image.save(str(large_path), 'JPEG')
+                outputs['large'].append(str(large_path))
 
                 # OCR işle
                 ocr_text = pytesseract.image_to_string(first_image, lang='nld')
-                ocr_path = os.path.join(base_path, 'ocr', f"{
-                                        file_base_name}.txt")
+                ocr_path = base_path / 'ocr' / f"{file_base_name}.txt"
                 with open(ocr_path, 'w', encoding='utf-8') as ocr_file:
                     ocr_file.write(ocr_text)
-                outputs['ocr'].append(ocr_path)
+                outputs['ocr'].append(str(ocr_path))
 
         except Exception as e:
             logger.error(f"Dosya işleme hatası {file_base_name}: {str(e)}")
