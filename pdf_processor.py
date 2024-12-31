@@ -74,39 +74,49 @@ class PDFProcessor:
                     article_ranges: List[List[int]] = None,
                     merge_ranges: List[Tuple[int, int]] = None,
                     merge_article_indices: List[int] = None) -> Dict[str, List[str]]:
-        """
-        PDF işleme ana metodu
-        article_ranges: Makale sayfa aralıkları [[1,3], [4,6], ...]
-        merge_ranges: Direkt sayfa birleştirme [(1,3), (4,6), ...]
-        merge_article_indices: Birleştirilecek makale indeksleri [0,2] gibi
-        """
+        """PDF işleme ana metodu"""
+        logger = None
+
         try:
+            # Dosya adından year ve number değerlerini çıkar
             pdf_name = os.path.splitext(os.path.basename(input_pdf))[
                 0].replace('VHK_', '')
-            year, number = pdf_name.split('-')
-            base_path = self.create_output_folders(pdf_name)
+
+            # Dosya adı formatını kontrol et ve ayır
+            try:
+                if '-' in pdf_name:
+                    year, number = pdf_name.split('-')
+                else:
+                    # Eğer tire yoksa, timestamp kullan
+                    current_time = datetime.now()
+                    year = str(current_time.year)
+                    number = current_time.strftime("%m%d")
+            except ValueError:
+                # Herhangi bir hata durumunda timestamp kullan
+                current_time = datetime.now()
+                year = str(current_time.year)
+                number = current_time.strftime("%m%d")
+
+            base_path = self.create_output_folders(
+                f"{year}{number}")  # Klasör adında tire yok
             logger = self.setup_logging(base_path)
 
             logger.info(f"PDF işleme başladı: {pdf_name}")
             reader = PdfReader(input_pdf)
 
-            # Makale birleştirme işlemini yap
             if merge_article_indices and article_ranges:
                 article_ranges = self._merge_articles(
                     article_ranges, merge_article_indices, logger)
 
-            # Sayfa birleştirme varsa işle
             if merge_ranges:
                 logger.info(f"Sayfa birleştirme aralıkları işleniyor: {
                             merge_ranges}")
                 return self._process_with_merges(reader, year, number, merge_ranges, base_path, logger)
 
-            # Makale aralıkları varsa işle
             if article_ranges:
                 logger.info(f"Makale aralıkları işleniyor: {article_ranges}")
                 return self._process_articles(reader, year, number, article_ranges, pages_to_remove or [], base_path, logger)
 
-            # Normal sayfa işleme
             logger.info("Tekli sayfalar işleniyor")
             return self._process_single_pages(reader, year, number, base_path, logger, pages_to_remove or [])
 
@@ -127,15 +137,12 @@ class PDFProcessor:
             if not (0 <= idx1 < len(article_ranges) and 0 <= idx2 < len(article_ranges)):
                 raise ValueError("Geçersiz makale indeksleri")
 
-            # Birleştirilecek aralıkları al
             range1 = article_ranges[idx1]
             range2 = article_ranges[idx2]
 
-            # Yeni birleştirilmiş aralık
             merged_range = list(
                 range(min(range1[0], range2[0]), max(range1[-1], range2[-1]) + 1))
 
-            # Orijinal listeyi güncelle
             new_ranges = []
             for i, range_item in enumerate(article_ranges):
                 if i not in merge_indices:
@@ -152,7 +159,7 @@ class PDFProcessor:
             raise
 
     def _process_with_merges(self, reader: PdfReader, year: str, number: str,
-                             merge_ranges: List[Tuple[int, int]], base_path: str,
+                             merge_ranges: List[Tuple[int, int]], base_path: Path,
                              logger: logging.Logger) -> Dict[str, List[str]]:
         """Birleştirme aralıklarını işle"""
         outputs = {
@@ -164,7 +171,6 @@ class PDFProcessor:
 
         processed_pages = set()
 
-        # Birleştirilecek aralıkları işle
         for start_page, end_page in merge_ranges:
             if not (1 <= start_page <= len(reader.pages) and 1 <= end_page <= len(reader.pages)):
                 logger.warning(f"Geçersiz sayfa aralığı: {
@@ -184,7 +190,6 @@ class PDFProcessor:
             for key in outputs:
                 outputs[key].extend(merge_outputs[key])
 
-        # Birleştirilmemiş sayfaları işle
         for page_num in range(len(reader.pages)):
             actual_page = page_num + 1
             if actual_page not in processed_pages:
@@ -200,9 +205,64 @@ class PDFProcessor:
 
         return outputs
 
+    def _save_outputs(self, writer: PdfWriter, file_base_name: str,
+                      base_path: Path, logger: logging.Logger) -> Dict[str, List[str]]:
+        """PDF, görüntü ve OCR çıktılarını kaydet"""
+        outputs = {
+            'pdf': [],
+            'small': [],
+            'large': [],
+            'ocr': []
+        }
+
+        temp_path = None
+        try:
+            pdf_path = base_path / 'pdf' / f"{file_base_name}.pdf"
+            with open(pdf_path, 'wb') as pdf_file:
+                writer.write(pdf_file)
+            outputs['pdf'].append(str(pdf_path))
+
+            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_pdf:
+                writer.write(temp_pdf)
+                temp_path = temp_pdf.name
+
+            images = convert_from_path(temp_path)
+            if images:
+                first_image = images[0]
+
+                small_path = base_path / 'small' / f"{file_base_name}.jpg"
+                small_image = first_image.copy()
+                small_image.thumbnail((800, 800))
+                small_image.save(str(small_path), 'JPEG')
+                outputs['small'].append(str(small_path))
+
+                large_path = base_path / 'large' / f"{file_base_name}.jpg"
+                first_image.save(str(large_path), 'JPEG')
+                outputs['large'].append(str(large_path))
+
+                ocr_text = pytesseract.image_to_string(first_image, lang='nld')
+                ocr_path = base_path / 'ocr' / f"{file_base_name}.txt"
+                with open(ocr_path, 'w', encoding='utf-8') as ocr_file:
+                    ocr_file.write(ocr_text)
+                outputs['ocr'].append(str(ocr_path))
+
+        except Exception as e:
+            logger.error(f"Dosya işleme hatası {file_base_name}: {str(e)}")
+            raise
+
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except Exception as e:
+                    logger.warning(f"Geçici dosya silinemedi {
+                                   temp_path}: {str(e)}")
+
+        return outputs
+
     def _process_articles(self, reader: PdfReader, year: str, number: str,
                           article_ranges: List[List[int]], pages_to_remove: List[int],
-                          base_path: str, logger: logging.Logger) -> Dict[str, List[str]]:
+                          base_path: Path, logger: logging.Logger) -> Dict[str, List[str]]:
         """Makale aralıklarını işle"""
         outputs = {
             'pdf': [],
@@ -230,7 +290,7 @@ class PDFProcessor:
         return outputs
 
     def _process_single_pages(self, reader: PdfReader, year: str, number: str,
-                              base_path: str, logger: logging.Logger,
+                              base_path: Path, logger: logging.Logger,
                               pages_to_remove: List[int]) -> Dict[str, List[str]]:
         """Tek sayfaları işle"""
         outputs = {
@@ -253,82 +313,3 @@ class PDFProcessor:
                     outputs[key].extend(page_outputs[key])
 
         return outputs
-
-    def _save_outputs(self, writer: PdfWriter, file_base_name: str,
-                      base_path: Path, logger: logging.Logger) -> Dict[str, List[str]]:
-        """PDF, görüntü ve OCR çıktılarını kaydet"""
-        outputs = {
-            'pdf': [],
-            'small': [],
-            'large': [],
-            'ocr': []
-        }
-
-        temp_path = None
-        try:
-            # PDF kaydet
-            pdf_path = base_path / 'pdf' / f"{file_base_name}.pdf"
-            with open(pdf_path, 'wb') as pdf_file:
-                writer.write(pdf_file)
-            outputs['pdf'].append(str(pdf_path))
-
-            # Geçici dosya oluştur
-            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_pdf:
-                writer.write(temp_pdf)
-                temp_path = temp_pdf.name
-
-            # PDF'i görüntüye dönüştür
-            images = convert_from_path(temp_path)
-            if images:
-                first_image = images[0]
-
-                # Küçük resim kaydet
-                small_path = base_path / 'small' / f"{file_base_name}.jpg"
-                small_image = first_image.copy()
-                small_image.thumbnail((800, 800))
-                small_image.save(str(small_path), 'JPEG')
-                outputs['small'].append(str(small_path))
-
-                # Büyük resim kaydet
-                large_path = base_path / 'large' / f"{file_base_name}.jpg"
-                first_image.save(str(large_path), 'JPEG')
-                outputs['large'].append(str(large_path))
-
-                # OCR işle
-                ocr_text = pytesseract.image_to_string(first_image, lang='nld')
-                ocr_path = base_path / 'ocr' / f"{file_base_name}.txt"
-                with open(ocr_path, 'w', encoding='utf-8') as ocr_file:
-                    ocr_file.write(ocr_text)
-                outputs['ocr'].append(str(ocr_path))
-
-        except Exception as e:
-            logger.error(f"Dosya işleme hatası {file_base_name}: {str(e)}")
-            raise
-
-        finally:
-            if temp_path and os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except Exception as e:
-                    logger.warning(f"Geçici dosya silinemedi {
-                                   temp_path}: {str(e)}")
-
-        return outputs
-
-
-# Kullanım örneği:
-if __name__ == "__main__":
-    processor = PDFProcessor("uploads", "outputs")
-
-    # Birleştirme örneği:
-    try:
-        result = processor.process_pdf(
-            input_pdf="VHK_2008-4.pdf",
-            pages_to_remove=[3, 6, 9, 22],
-            article_ranges=[[1, 3], [3, 7], [8, 11], [12, 15],
-                            [16, 19], [20, 24], [25, 30], [30, 36]],
-            merge_ranges=[(3, 5)]  # Birleştirilecek sayfa aralıkları
-        )
-        print("İşlem başarılı:", result)
-    except Exception as e:
-        print("Hata:", str(e))
