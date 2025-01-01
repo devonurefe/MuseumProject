@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_file, jsonify
+from flask import Flask, render_template, request, jsonify
 import os
 from werkzeug.utils import secure_filename
 from pdf_processor import PDFProcessor
@@ -33,9 +33,12 @@ def upload_file():
 
     if file and allowed_file(file.filename):
         # Geçici dosya oluştur
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
-            file.save(temp_file.name)
-            filepath = temp_file.name
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+                file.save(temp_file.name)
+                filepath = temp_file.name
+        except Exception as e:
+            return jsonify({'error': f'Fout bij het opslaan van het bestand: {str(e)}'}), 500
 
         try:
             # Form verilerini işle
@@ -64,13 +67,19 @@ def upload_file():
                 except ValueError:
                     return jsonify({'error': 'Ongeldige invoer voor samenvoegen'}), 400
 
+            # Yıl ve sayı bilgilerini al
+            year = request.form.get('year')
+            number = request.form.get('number', '')
+
             # PDF'i işle
             outputs = pdf_processor.process_pdf(
                 input_pdf=filepath,
                 pages_to_remove=remove_pages,
                 article_ranges=article_ranges,
                 merge_ranges=merge_ranges,
-                merge_article_indices=merge_article_indices
+                merge_article_indices=merge_article_indices,
+                year=year,
+                number=number
             )
 
             # Downloads klasör yolunu al

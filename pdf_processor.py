@@ -1,18 +1,18 @@
 import os
+import logging
 from datetime import datetime
-from PIL import Image
 from PyPDF2 import PdfReader, PdfWriter
 from pdf2image import convert_from_path
 import pytesseract
-import logging
 import tempfile
-from typing import List, Dict, Optional, Tuple, Union
+from typing import List, Dict, Optional, Tuple
 from pathlib import Path
 
 
 class PDFProcessor:
     def __init__(self):
         self.setup_tesseract()
+        self.logger = None
 
     @staticmethod
     def setup_tesseract():
@@ -26,20 +26,24 @@ class PDFProcessor:
     def get_downloads_folder(self) -> Path:
         """Kullanıcının Downloads klasörünü tespit et"""
         home = Path.home()
-        if os.name == 'nt':  # Windows
-            downloads = home / 'Downloads'
-        elif os.name == 'posix':  # macOS ve Linux
-            downloads = home / 'Downloads'
-        else:
-            downloads = home / 'Downloads'
-
+        downloads = home / 'Downloads'
         downloads.mkdir(parents=True, exist_ok=True)
         return downloads
 
-    def create_output_folders(self, output_name: str) -> Path:
-        """Çıktı klasörlerini Downloads içinde oluştur"""
+    def setup_logging(self, base_path: Path) -> logging.Logger:
+        """Logging ayarlarını yapar"""
+        log_file = base_path / 'log' / \
+            f"{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+        logging.basicConfig(filename=log_file, level=logging.INFO,
+                            format='%(asctime)s - %(levelname)s - %(message)s')
+        logger = logging.getLogger()
+        return logger
+
+    def create_output_folders(self, year: str, number: str) -> Path:
+        """Çıktı klasörlerini oluştur ve çıktı klasör adını yıl ve sayı bilgisine göre belirle"""
         downloads = self.get_downloads_folder()
-        base_path = downloads / f"output{output_name}"  # Tire kaldırıldı
+        # Yıl ve sayı bilgisi ile klasör oluştur
+        base_path = downloads / f"output{year}{number}"
         folders = ['pdf', 'ocr', 'small', 'large', 'log']
 
         for folder in folders:
@@ -48,57 +52,26 @@ class PDFProcessor:
 
         return base_path
 
-    def setup_logging(self, base_output_path: Path) -> logging.Logger:
-        """Logging yapılandırması"""
-        log_dir = base_output_path / 'log'
-        log_dir.mkdir(exist_ok=True)
-
-        log_filename = f"log{datetime.now().strftime(
-            '%y%m%d')}.txt"  # Tire kaldırıldı
-        log_path = log_dir / log_filename
-
-        logging.basicConfig(
-            filename=str(log_path),
-            level=logging.INFO,
-            format='%(asctime)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        )
-        return logging.getLogger()
-
     @staticmethod
     def generate_filename(year: str, number: str, start_page: int, end_page: int) -> str:
-        """Standart dosya adı oluştur - tire olmadan"""
-        return f"{year}{str(number).zfill(2)}{str(start_page).zfill(2)}{str(end_page).zfill(2)}"
+        """Standart dosya adı oluştur - istenen formatta"""
+        return f"{year}{number.zfill(2)}{str(start_page).zfill(2)}{str(end_page).zfill(2)}"
 
     def process_pdf(self, input_pdf: str, pages_to_remove: List[int] = None,
                     article_ranges: List[List[int]] = None,
                     merge_ranges: List[Tuple[int, int]] = None,
-                    merge_article_indices: List[int] = None) -> Dict[str, List[str]]:
+                    merge_article_indices: List[int] = None,
+                    year: str = None,
+                    number: str = None) -> Dict[str, List[str]]:
         """PDF işleme ana metodu"""
         logger = None
 
         try:
-            # Dosya adından year ve number değerlerini çıkar
             pdf_name = os.path.splitext(os.path.basename(input_pdf))[
                 0].replace('VHK_', '')
 
-            # Dosya adı formatını kontrol et ve ayır
-            try:
-                if '-' in pdf_name:
-                    year, number = pdf_name.split('-')
-                else:
-                    # Eğer tire yoksa, timestamp kullan
-                    current_time = datetime.now()
-                    year = str(current_time.year)
-                    number = current_time.strftime("%m%d")
-            except ValueError:
-                # Herhangi bir hata durumunda timestamp kullan
-                current_time = datetime.now()
-                year = str(current_time.year)
-                number = current_time.strftime("%m%d")
-
-            base_path = self.create_output_folders(
-                f"{year}{number}")  # Klasör adında tire yok
+            # Yıl ve sayı bilgisi ile klasör oluştur
+            base_path = self.create_output_folders(year, number)
             logger = self.setup_logging(base_path)
 
             logger.info(f"PDF işleme başladı: {pdf_name}")
@@ -109,8 +82,8 @@ class PDFProcessor:
                     article_ranges, merge_article_indices, logger)
 
             if merge_ranges:
-                logger.info(f"Sayfa birleştirme aralıkları işleniyor: {
-                            merge_ranges}")
+                logger.info(
+                    f"Sayfa birleştirme aralıkları işleniyor: {merge_ranges}")
                 return self._process_with_merges(reader, year, number, merge_ranges, base_path, logger)
 
             if article_ranges:
@@ -125,9 +98,7 @@ class PDFProcessor:
                 logger.error(f"PDF işleme hatası: {str(e)}")
             raise
 
-    def _merge_articles(self, article_ranges: List[List[int]],
-                        merge_indices: List[int],
-                        logger: logging.Logger) -> List[List[int]]:
+    def _merge_articles(self, article_ranges: List[List[int]], merge_indices: List[int], logger: logging.Logger) -> List[List[int]]:
         """Makale aralıklarını birleştir"""
         try:
             if len(merge_indices) != 2:
@@ -142,16 +113,13 @@ class PDFProcessor:
 
             merged_range = list(
                 range(min(range1[0], range2[0]), max(range1[-1], range2[-1]) + 1))
+            new_ranges = [range_item for i, range_item in enumerate(
+                article_ranges) if i not in merge_indices]
 
-            new_ranges = []
-            for i, range_item in enumerate(article_ranges):
-                if i not in merge_indices:
-                    new_ranges.append(range_item)
-                elif i == min(merge_indices):
-                    new_ranges.append(merged_range)
+            new_ranges.append(merged_range)
+            logger.info(
+                f"Makaleler birleştirildi: {merge_indices} -> {merged_range}")
 
-            logger.info(f"Makaleler birleştirildi: {
-                        merge_indices} -> {merged_range}")
             return new_ranges
 
         except Exception as e:
@@ -162,19 +130,13 @@ class PDFProcessor:
                              merge_ranges: List[Tuple[int, int]], base_path: Path,
                              logger: logging.Logger) -> Dict[str, List[str]]:
         """Birleştirme aralıklarını işle"""
-        outputs = {
-            'pdf': [],
-            'small': [],
-            'large': [],
-            'ocr': []
-        }
-
+        outputs = {'pdf': [], 'small': [], 'large': [], 'ocr': []}
         processed_pages = set()
 
         for start_page, end_page in merge_ranges:
             if not (1 <= start_page <= len(reader.pages) and 1 <= end_page <= len(reader.pages)):
-                logger.warning(f"Geçersiz sayfa aralığı: {
-                               start_page}-{end_page}")
+                logger.warning(
+                    f"Geçersiz sayfa aralığı: {start_page}-{end_page}")
                 continue
 
             writer = PdfWriter()
@@ -208,14 +170,9 @@ class PDFProcessor:
     def _save_outputs(self, writer: PdfWriter, file_base_name: str,
                       base_path: Path, logger: logging.Logger) -> Dict[str, List[str]]:
         """PDF, görüntü ve OCR çıktılarını kaydet"""
-        outputs = {
-            'pdf': [],
-            'small': [],
-            'large': [],
-            'ocr': []
-        }
-
+        outputs = {'pdf': [], 'small': [], 'large': [], 'ocr': []}
         temp_path = None
+
         try:
             pdf_path = base_path / 'pdf' / f"{file_base_name}.pdf"
             with open(pdf_path, 'wb') as pdf_file:
@@ -255,8 +212,8 @@ class PDFProcessor:
                 try:
                     os.remove(temp_path)
                 except Exception as e:
-                    logger.warning(f"Geçici dosya silinemedi {
-                                   temp_path}: {str(e)}")
+                    logger.warning(
+                        f"Geçici dosya silinemedi: {temp_path}: {str(e)}")
 
         return outputs
 
@@ -264,12 +221,7 @@ class PDFProcessor:
                           article_ranges: List[List[int]], pages_to_remove: List[int],
                           base_path: Path, logger: logging.Logger) -> Dict[str, List[str]]:
         """Makale aralıklarını işle"""
-        outputs = {
-            'pdf': [],
-            'small': [],
-            'large': [],
-            'ocr': []
-        }
+        outputs = {'pdf': [], 'small': [], 'large': [], 'ocr': []}
 
         for article_pages in article_ranges:
             start_page = min(article_pages)
@@ -293,12 +245,7 @@ class PDFProcessor:
                               base_path: Path, logger: logging.Logger,
                               pages_to_remove: List[int]) -> Dict[str, List[str]]:
         """Tek sayfaları işle"""
-        outputs = {
-            'pdf': [],
-            'small': [],
-            'large': [],
-            'ocr': []
-        }
+        outputs = {'pdf': [], 'small': [], 'large': [], 'ocr': []}
 
         for page_num in range(len(reader.pages)):
             if page_num + 1 not in pages_to_remove:
