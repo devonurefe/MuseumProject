@@ -40,22 +40,28 @@ class PDFProcessor:
         return logger
 
     def create_output_folders(self, year: str, number: str) -> Path:
-        """Çıktı klasörlerini oluştur ve çıktı klasör adını yıl ve sayı bilgisine göre belirle"""
+        """Çıktı klasörlerini oluştur ve çıktı klasör adını yıl ve sayi bilgisine göre belirle"""
         downloads = self.get_downloads_folder()
-        # Yıl ve sayı bilgisi ile klasör oluştur
         base_path = downloads / f"output{year}{number}"
         folders = ['pdf', 'ocr', 'small', 'large', 'log']
-
         for folder in folders:
             folder_path = base_path / folder
             folder_path.mkdir(parents=True, exist_ok=True)
-
         return base_path
 
     @staticmethod
     def generate_filename(year: str, number: str, start_page: int, end_page: int) -> str:
         """Standart dosya adı oluştur - istenen formatta"""
         return f"{year}{number.zfill(2)}{str(start_page).zfill(2)}{str(end_page).zfill(2)}"
+
+    def compress_pdf(self, input_pdf: str, output_pdf: str):
+        """PDF dosyasını sıkıştır"""
+        reader = PdfReader(input_pdf)
+        writer = PdfWriter()
+        for page in reader.pages:
+            writer.add_page(page)
+        with open(output_pdf, 'wb') as pdf_file:
+            writer.write(pdf_file)
 
     def process_pdf(self, input_pdf: str, pages_to_remove: List[int] = None,
                     article_ranges: List[List[int]] = None,
@@ -65,17 +71,18 @@ class PDFProcessor:
                     number: str = None) -> Dict[str, List[str]]:
         """PDF işleme ana metodu"""
         logger = None
-
         try:
             pdf_name = os.path.splitext(os.path.basename(input_pdf))[
                 0].replace('VHK_', '')
-
-            # Yıl ve sayı bilgisi ile klasör oluştur
             base_path = self.create_output_folders(year, number)
             logger = self.setup_logging(base_path)
-
             logger.info(f"PDF işleme başladı: {pdf_name}")
-            reader = PdfReader(input_pdf)
+
+            compressed_pdf_path = tempfile.NamedTemporaryFile(
+                suffix='.pdf', delete=False).name
+            self.compress_pdf(input_pdf, compressed_pdf_path)
+
+            reader = PdfReader(compressed_pdf_path)
 
             if merge_article_indices and article_ranges:
                 article_ranges = self._merge_articles(
@@ -102,26 +109,21 @@ class PDFProcessor:
         """Makale aralıklarını birleştir"""
         try:
             if len(merge_indices) != 2:
-                raise ValueError("Tam olarak 2 makale indeksi belirtilmelidir")
-
+                raise ValueError(
+                    "Tam olarak 2 makale indeksi belirtilmelidir.")
             idx1, idx2 = merge_indices
             if not (0 <= idx1 < len(article_ranges) and 0 <= idx2 < len(article_ranges)):
-                raise ValueError("Geçersiz makale indeksleri")
-
+                raise ValueError("Geçersiz makale indeksleri.")
             range1 = article_ranges[idx1]
             range2 = article_ranges[idx2]
-
             merged_range = list(
                 range(min(range1[0], range2[0]), max(range1[-1], range2[-1]) + 1))
             new_ranges = [range_item for i, range_item in enumerate(
                 article_ranges) if i not in merge_indices]
-
             new_ranges.append(merged_range)
             logger.info(
                 f"Makaleler birleştirildi: {merge_indices} -> {merged_range}")
-
             return new_ranges
-
         except Exception as e:
             logger.error(f"Makale birleştirme hatası: {str(e)}")
             raise
@@ -132,23 +134,19 @@ class PDFProcessor:
         """Birleştirme aralıklarını işle"""
         outputs = {'pdf': [], 'small': [], 'large': [], 'ocr': []}
         processed_pages = set()
-
         for start_page, end_page in merge_ranges:
             if not (1 <= start_page <= len(reader.pages) and 1 <= end_page <= len(reader.pages)):
                 logger.warning(
                     f"Geçersiz sayfa aralığı: {start_page}-{end_page}")
                 continue
-
             writer = PdfWriter()
             for page_num in range(start_page - 1, end_page):
                 writer.add_page(reader.pages[page_num])
                 processed_pages.add(page_num + 1)
-
             file_base_name = self.generate_filename(
                 year, number, start_page, end_page)
             merge_outputs = self._save_outputs(
                 writer, file_base_name, base_path, logger)
-
             for key in outputs:
                 outputs[key].extend(merge_outputs[key])
 
@@ -159,7 +157,6 @@ class PDFProcessor:
                 writer.add_page(reader.pages[page_num])
                 file_base_name = self.generate_filename(
                     year, number, actual_page, actual_page)
-
                 page_outputs = self._save_outputs(
                     writer, file_base_name, base_path, logger)
                 for key in outputs:
@@ -172,41 +169,35 @@ class PDFProcessor:
         """PDF, görüntü ve OCR çıktılarını kaydet"""
         outputs = {'pdf': [], 'small': [], 'large': [], 'ocr': []}
         temp_path = None
-
         try:
             pdf_path = base_path / 'pdf' / f"{file_base_name}.pdf"
             with open(pdf_path, 'wb') as pdf_file:
                 writer.write(pdf_file)
             outputs['pdf'].append(str(pdf_path))
 
-            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_pdf:
-                writer.write(temp_pdf)
-                temp_path = temp_pdf.name
-
+            temp_path = tempfile.NamedTemporaryFile(
+                suffix='.pdf', delete=False).name
+            writer.write(open(temp_path, 'wb'))
             images = convert_from_path(temp_path)
             if images:
                 first_image = images[0]
-
                 small_path = base_path / 'small' / f"{file_base_name}.jpg"
                 small_image = first_image.copy()
                 small_image.thumbnail((800, 800))
                 small_image.save(str(small_path), 'JPEG')
                 outputs['small'].append(str(small_path))
-
                 large_path = base_path / 'large' / f"{file_base_name}.jpg"
                 first_image.save(str(large_path), 'JPEG')
                 outputs['large'].append(str(large_path))
-
-                ocr_text = pytesseract.image_to_string(first_image, lang='nld')
+                ocr_text = pytesseract.image_to_string(
+                    first_image, lang='nld')  # Hollandaca
                 ocr_path = base_path / 'ocr' / f"{file_base_name}.txt"
                 with open(ocr_path, 'w', encoding='utf-8') as ocr_file:
                     ocr_file.write(ocr_text)
                 outputs['ocr'].append(str(ocr_path))
-
         except Exception as e:
             logger.error(f"Dosya işleme hatası {file_base_name}: {str(e)}")
             raise
-
         finally:
             if temp_path and os.path.exists(temp_path):
                 try:
@@ -214,7 +205,6 @@ class PDFProcessor:
                 except Exception as e:
                     logger.warning(
                         f"Geçici dosya silinemedi: {temp_path}: {str(e)}")
-
         return outputs
 
     def _process_articles(self, reader: PdfReader, year: str, number: str,
@@ -222,23 +212,19 @@ class PDFProcessor:
                           base_path: Path, logger: logging.Logger) -> Dict[str, List[str]]:
         """Makale aralıklarını işle"""
         outputs = {'pdf': [], 'small': [], 'large': [], 'ocr': []}
-
         for article_pages in article_ranges:
             start_page = min(article_pages)
             end_page = max(article_pages)
             file_base_name = self.generate_filename(
                 year, number, start_page, end_page)
-
             writer = PdfWriter()
             for page_num in article_pages:
                 if page_num not in pages_to_remove:
                     writer.add_page(reader.pages[page_num - 1])
-
             article_outputs = self._save_outputs(
                 writer, file_base_name, base_path, logger)
             for key in outputs:
                 outputs[key].extend(article_outputs[key])
-
         return outputs
 
     def _process_single_pages(self, reader: PdfReader, year: str, number: str,
@@ -246,17 +232,14 @@ class PDFProcessor:
                               pages_to_remove: List[int]) -> Dict[str, List[str]]:
         """Tek sayfaları işle"""
         outputs = {'pdf': [], 'small': [], 'large': [], 'ocr': []}
-
         for page_num in range(len(reader.pages)):
             if page_num + 1 not in pages_to_remove:
                 writer = PdfWriter()
                 writer.add_page(reader.pages[page_num])
                 file_base_name = self.generate_filename(
                     year, number, page_num + 1, page_num + 1)
-
                 page_outputs = self._save_outputs(
                     writer, file_base_name, base_path, logger)
                 for key in outputs:
                     outputs[key].extend(page_outputs[key])
-
         return outputs
