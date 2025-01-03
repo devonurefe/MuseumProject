@@ -5,7 +5,7 @@ from pdf_processor import PDFProcessor
 import tempfile
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max-limit
+app.config['MAX_CONTENT_LENGTH'] = 40 * 1024 * 1024  # 16MB max-limit
 
 ALLOWED_EXTENSIONS = {'pdf'}
 
