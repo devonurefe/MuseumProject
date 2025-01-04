@@ -3,9 +3,20 @@ import os
 from werkzeug.utils import secure_filename
 from pdf_processor import PDFProcessor
 import tempfile
+import webbrowser
 
-app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 40 * 1024 * 1024  # 16MB max-limit
+# Absolute path kullanarak template_folder'ı belirtelim
+template_dir = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), 'templates'))
+static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'static'))
+
+app = Flask(__name__,
+            template_folder=template_dir,
+            static_folder=static_dir)
+
+# old
+
+app.config['MAX_CONTENT_LENGTH'] = 40 * 1024 * 1024  # 40MB max-limit
 
 ALLOWED_EXTENSIONS = {'pdf'}
 
@@ -19,6 +30,10 @@ def allowed_file(filename):
 
 @app.route('/')
 def index():
+    print("Working Directory:", os.getcwd())
+    print("Templates path:", os.path.join(os.getcwd(), 'templates'))
+    print("Index.html exists:", os.path.exists(
+        os.path.join(os.getcwd(), 'templates', 'index.html')))
     return render_template('index.html')
 
 
@@ -101,4 +116,5 @@ def upload_file():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    webbrowser.open('http://localhost:5000')
+    app.run(host='0.0.0.0', port=5000, debug=False)
