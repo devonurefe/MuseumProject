@@ -3,7 +3,6 @@ import os
 from werkzeug.utils import secure_filename
 from pdf_processor import PDFProcessor
 import tempfile
-import webbrowser
 
 # Absolute path kullanarak template_folder'ı belirtelim
 template_dir = os.path.abspath(os.path.join(
@@ -116,5 +115,4 @@ def upload_file():
 
 
 if __name__ == '__main__':
-    webbrowser.open('http://localhost:5000')
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000)

@@ -17,10 +17,24 @@ class PDFProcessor:
     @staticmethod
     def setup_tesseract():
         """Tesseract yapılandırması"""
-        # Eğer TESSERACT_PATH ortam değişkeni ayarlandıysa, onu kullan
-        tesseract_path = os.getenv(
-            'TESSERACT_PATH', r'C:\Program Files\Tesseract-OCR\tesseract.exe')
+        import platform
+
+        # Platforma göre varsayılan Tesseract yolu
+        if platform.system() == "Windows":
+            tesseract_path = os.getenv(
+                'TESSERACT_PATH', r'C:\Program Files\Tesseract-OCR\tesseract.exe')
+        else:
+            tesseract_path = os.getenv('TESSERACT_PATH', '/usr/bin/tesseract')
+
+        # Tesseract'ın yolunu ayarla
         pytesseract.pytesseract.tesseract_cmd = tesseract_path
+
+        # Tesseract'ın çalışıp çalışmadığını kontrol et
+        if not os.path.isfile(pytesseract.pytesseract.tesseract_cmd):
+            raise FileNotFoundError(
+                f"Tesseract bulunamadı: {pytesseract.pytesseract.tesseract_cmd}. "
+                "Lütfen Tesseract'ı yükleyin ve doğru bir yol belirtin."
+            )
 
     def get_downloads_folder(self) -> Path:
         """Kullanıcının Downloads klasörünü tespit et"""
