@@ -20,11 +20,13 @@ class PDFProcessor:
         import platform
 
         # Platforma göre varsayılan Tesseract yolu
-        if platform.system() == "Windows":
-            tesseract_path = os.getenv(
-                'TESSERACT_PATH', r'C:\Program Files\Tesseract-OCR\tesseract.exe')
+        if platform.system() == "Linux":
+            tesseract_path = "/usr/bin/tesseract"
+
         else:
-            tesseract_path = os.getenv('TESSERACT_PATH', '/usr/bin/tesseract')
+            tesseract_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
+        pytesseract.pytesseract.tesseract_cmd = tesseract_path
 
         # Tesseract'ın yolunu ayarla
         pytesseract.pytesseract.tesseract_cmd = tesseract_path
