@@ -13,8 +13,7 @@ app = Flask(__name__,
             template_folder=template_dir,
             static_folder=static_dir)
 
-# old
-
+# Max content length ayarı
 app.config['MAX_CONTENT_LENGTH'] = 40 * 1024 * 1024  # 40MB max-limit
 
 ALLOWED_EXTENSIONS = {'pdf'}
@@ -97,7 +96,7 @@ def upload_file():
             )
 
             # Downloads klasör yolunu al
-            output_path = pdf_processor.get_downloads_folder()
+            output_path = pdf_processor.create_output_folders(year, number)
 
             return jsonify({
                 'success': True,
@@ -115,4 +114,5 @@ def upload_file():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
