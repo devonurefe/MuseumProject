@@ -3,6 +3,7 @@ import os
 from werkzeug.utils import secure_filename
 from pdf_processor import PDFProcessor
 import tempfile
+import base64
 
 # Absolute path kullanarak template_folder'ı belirtelim
 template_dir = os.path.abspath(os.path.join(
@@ -66,10 +67,6 @@ def upload_file():
 
     if file and allowed_file(file.filename):
         try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
-                file.save(temp_file.name)
-                filepath = temp_file.name
-
             # Form verilerini al
             article_ranges_str = request.form.get('article_ranges', '')
             remove_pages_str = request.form.get('remove_pages', '')
@@ -99,13 +96,17 @@ def upload_file():
             merge_article_indices = None
             if merge_ranges_str:
                 try:
-                    # String'i integer listesine çevir ve 1-tabanlı indeksleri koru
                     merge_article_indices = [
                         int(x.strip()) for x in merge_ranges_str.split(',') if x.strip()]
                     if len(merge_article_indices) < 2:
                         raise ValueError("En az iki makale indeksi gerekli")
                 except ValueError as e:
                     return jsonify({'error': 'Geçersiz birleştirme indeksleri'}), 400
+
+            # PDF'i geçici dosyaya kaydet
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+                file.save(temp_file.name)
+                filepath = temp_file.name
 
             # PDF'i işle
             output_files = pdf_processor.process_pdf(
@@ -117,18 +118,41 @@ def upload_file():
                 number=number
             )
 
+            # Geçici dosyaları base64'e çevir
+            file_contents = {}
+            for file_type, file_list in output_files.items():
+                file_contents[file_type] = []
+                for file_path in file_list:
+                    with open(file_path, 'rb') as f:
+                        content = f.read()
+                        filename = os.path.basename(file_path)
+                        file_contents[file_type].append({
+                            'name': filename,
+                            'data': base64.b64encode(content).decode('utf-8')
+                        })
+
             return jsonify({
                 'success': True,
                 'message': 'Bestand succesvol verwerkt',
-                'files': output_files,
-                'download_ready': True
+                'files': file_contents
             })
 
         except Exception as e:
             return jsonify({'error': str(e)}), 500
         finally:
-            if os.path.exists(filepath):
-                os.remove(filepath)
+            # Geçici dosyaları temizle
+            if 'filepath' in locals():
+                try:
+                    os.remove(filepath)
+                except:
+                    pass
+            if 'output_files' in locals():
+                for file_list in output_files.values():
+                    for file_path in file_list:
+                        try:
+                            os.remove(file_path)
+                        except:
+                            pass
 
     return jsonify({'error': 'Niet-toegestaan bestandstype'}), 400
 

@@ -34,18 +34,13 @@ class PDFProcessor:
             raise FileNotFoundError(
                 f"Tesseract bulunamadı: {tesseract_path}. Lütfen yükleyin.")
 
-    def create_output_folders(self, year: str, number: str) -> Path:
-        """Kullanıcının Downloads klasöründe çıktı klasörlerini oluştur"""
-        downloads_folder = Path.home() / 'Downloads' / 'museumproject'
-        # Downloads klasörünü oluştur
-        downloads_folder.mkdir(parents=True, exist_ok=True)
-        base_path = downloads_folder / f'output{year}{number}'
-        # Output klasörünü oluştur
-        base_path.mkdir(parents=True, exist_ok=True)
+    def create_output_folders(self) -> Path:
+        """Geçici klasör oluştur"""
+        temp_dir = tempfile.mkdtemp()
+        base_path = Path(temp_dir)
 
         for folder in ['pdf', 'ocr', 'small', 'large', 'log']:
-            (base_path / folder).mkdir(parents=True,
-                                       exist_ok=True)  # Alt klasörleri oluştur
+            (base_path / folder).mkdir(parents=True, exist_ok=True)
 
         return base_path
 
@@ -78,7 +73,7 @@ class PDFProcessor:
                     article_ranges: List[List[int]] = None, merge_ranges: List[Tuple[int, int]] = None,
                     merge_article_indices: List[int] = None, year: str = None, number: str = None) -> Dict[str, List[str]]:
         try:
-            base_path = self.create_output_folders(year, number)
+            base_path = self.create_output_folders()
             self.logger = self.setup_logging(base_path)
             self.logger.info(
                 f"PDF işleme başladı: {os.path.basename(input_pdf)}")
