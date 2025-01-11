@@ -3,115 +3,246 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF Verwerking Tool</title>
+    <title>PDF Verwerkingstool</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-100 min-h-screen p-8">
     <div class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
-        <h1 class="text-2xl font-bold mb-6">PDF Verwerking Tool</h1>
-        <a class="text-red-500 text-xs font-bold my-4 block" href="{{ url_for('static', filename='PDF_Verwerking_Tool_Handleiding.pdf') }}" download>
-    Klik hier om de Handleiding te downloaden
+        <h1 class="text-2xl font-bold mb-6">PDF Verwerkingstool</h1>
+        <a class="text-red-500 text-xs font-bold my-4 block" href="{{ url_for('static', filename='PDF_Verwerking_Handleiding.pdf') }}" download>
+            Klik hier om de Handleiding te downloaden
         </a>
 
-        <form id="uploadForm" class="space-y-6">
+        <form id="uploadForm" class="space-y-4" enctype="multipart/form-data">
             <div>
-                <label class="block text-sm font-medium text-gray-700">
-                    Selecteer PDF bestand
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="pdf_file">
+                    Selecteer PDF bestand:
                 </label>
-                <input type="file" name="file" accept=".pdf" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                <input type="file" 
+                       id="pdf_file" 
+                       name="pdf_file" 
+                       accept=".pdf"
+                       required 
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700">
-                    Te verwijderen pagina's
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="year">
+                    Jaar:
                 </label>
-                <input type="text" name="remove_pages" placeholder="bijv. 5,6,13,33,34" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                <input type="text" 
+                       id="year" 
+                       name="year" 
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                       placeholder="bijv. 2012"
+                       required>
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700">
-                    Artikelbereiken
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="number">
+                    Nummer:
                 </label>
-                <input type="text" name="article_ranges" placeholder="bijv. 1-3,4-8,8-9" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                <input type="text" 
+                       id="number" 
+                       name="number" 
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                       placeholder="bijv. 2"
+                       required>
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700">
-                    Artikelen combineren (optioneel)
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="article_ranges">
+                    Paginabereiken (bijvoorbeeld: 1-3,4-6):
                 </label>
-                <p class="text-sm text-gray-500 mb-2">Voer twee paginanummers in om te combineren (bijv. "4,6")</p>
-                <input type="text" name="merge_pages" placeholder="bijv. 4,6" pattern="\d+,\d+" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                <input type="text" 
+                       id="article_ranges" 
+                       name="article_ranges" 
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                       placeholder="1-3,4-6">
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700">
-                    Welke jaar is het PDF?
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="merge_ranges">
+                    Pagina's samenvoegen (optioneel):
                 </label>
-                <input type="number" name="year" placeholder="bijv. 2012" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" required>
+                <input type="text" 
+                       id="merge_ranges" 
+                       name="merge_ranges" 
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                       placeholder="bijv. 1,3 (voor het samenvoegen van 1e en 3e artikel)">
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700">
-                    Welke nummer is het PDF? (optioneel)
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="remove_pages">
+                    Te verwijderen pagina's (komma gescheiden):
                 </label>
-                <input type="text" name="number" placeholder="bijv. 2" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                <input type="text" 
+                       id="remove_pages" 
+                       name="remove_pages" 
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                       placeholder="bijv. 1,2,3">
             </div>
 
-            <button type="submit" class="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors">
-                Uploaden en Verwerken
+            <button type="submit" 
+                    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                Verwerken
             </button>
         </form>
 
-        <div id="status" class="mt-6 hidden">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-            <p class="text-center mt-2">Bestand wordt verwerkt...</p>
+        <div id="status" class="mt-4">
+            <div class="processing-animation hidden">
+                <div class="spinner"></div>
+                <p class="processing-text">Verwerking bezig...</p>
+                <div class="progress-steps">
+                    <div class="step">PDF voorbereiden</div>
+                    <div class="step">Pagina's verwerken</div>
+                    <div class="step">OCR uitvoeren</div>
+                    <div class="step">Bestanden opslaan</div>
+                </div>
+            </div>
         </div>
 
         <div id="result" class="mt-6 hidden">
             <h2 class="text-lg font-semibold mb-2">Verwerkingsresultaten:</h2>
-            <ul id="outputList" class="list-disc pl-5 space-y-2"></ul>
+            
+            <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                <h3 class="text-sm font-medium text-gray-700">Download locatie:</h3>
+                <p id="downloadLocation" class="text-sm text-gray-600 break-all"></p>
+            </div>
+            
+            <div id="downloadLinks" class="space-y-2"></div>
         </div>
     </div>
 
+    <style>
+    .processing-animation {
+        text-align: center;
+        padding: 20px;
+    }
+
+    .spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #3498db;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+    }
+
+    .progress-steps {
+        margin-top: 20px;
+    }
+
+    .step {
+        padding: 5px;
+        margin: 5px 0;
+        opacity: 0.5;
+        transition: opacity 0.3s;
+    }
+
+    .step.active {
+        opacity: 1;
+        color: #3498db;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    </style>
+
     <script>
-        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('uploadForm');
+        const statusDiv = document.getElementById('status');
+        const processingAnimation = document.querySelector('.processing-animation');
+        const steps = document.querySelectorAll('.step');
+        const submitButton = form.querySelector('button[type="submit"]');
+        let currentStep = 0;
+
+        function updateProgress() {
+            steps.forEach((step, index) => {
+                if (index === currentStep) {
+                    step.classList.add('active');
+                } else {
+                    step.classList.remove('active');
+                }
+            });
+            currentStep = (currentStep + 1) % steps.length;
+        }
+
+        form.addEventListener('submit', async function(e) {
             e.preventDefault();
-
-            const status = document.getElementById('status');
-            const result = document.getElementById('result');
-            const outputList = document.getElementById('outputList');
-
-            status.classList.remove('hidden');
-            result.classList.add('hidden');
-            outputList.innerHTML = '';
-
-            const formData = new FormData(e.target);
-
+            
+            // Her yeni işlemde önceki sonuçları ve mesajları temizle
+            statusDiv.textContent = '';
+            statusDiv.className = '';
+            document.getElementById('result').classList.add('hidden');
+            document.getElementById('downloadLocation').innerHTML = '';
+            document.getElementById('downloadLinks').innerHTML = '';
+            
+            // Animasyonu göster
+            processingAnimation.classList.remove('hidden');
+            currentStep = 0; // Animasyonu baştan başlat
+            updateProgress(); // İlk adımı hemen göster
+            
+            // İlerleme animasyonunu başlat
+            const progressInterval = setInterval(updateProgress, 2000);
+            
+            const formData = new FormData(this);
+            
             try {
+                submitButton.disabled = true;
+                submitButton.textContent = 'Verwerking...';
+                
                 const response = await fetch('/upload', {
                     method: 'POST',
                     body: formData
                 });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    const resultMessage = document.createElement('li');
-                    resultMessage.innerHTML = `
-                        Verwerking voltooid. Bestanden zijn opgeslagen in:<br>
-                        <span class="font-mono text-sm">${data.outputPath}</span>
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    statusDiv.textContent = 'Bestand succesvol verwerkt!';
+                    statusDiv.className = 'mt-4 text-green-500';
+                    
+                    // İndirme konumunu göster
+                    const downloadLocation = document.getElementById('downloadLocation');
+                    downloadLocation.innerHTML = `
+                        <strong>Bestanden opgeslagen in:</strong><br>
+                        ${result.download_location}<br>
+                        <small class="text-gray-500">(De bestanden worden automatisch naar deze map gedownload)</small>
                     `;
-                    outputList.appendChild(resultMessage);
-                    result.classList.remove('hidden');
+                    
+                    if (result.files && result.files.length > 0) {
+                        const downloadLinks = document.getElementById('downloadLinks');
+                        downloadLinks.innerHTML = '';
+                        
+                        result.files.forEach(file => {
+                            const link = document.createElement('a');
+                            link.href = `/download/${encodeURIComponent(file)}`;
+                            link.className = 'bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-2 mb-2 inline-block';
+                            link.textContent = `Download ${file.split('/').pop()}`;
+                            downloadLinks.appendChild(link);
+                        });
+                        
+                        document.getElementById('result').classList.remove('hidden');
+                    }
                 } else {
-                    alert(`Fout: ${data.error}`);
+                    throw new Error(result.error || 'Er is een fout opgetreden');
                 }
             } catch (error) {
-                alert('Er is een fout opgetreden bij het verwerken van het bestand.');
+                statusDiv.textContent = `Fout: ${error.message}`;
+                statusDiv.className = 'mt-4 text-red-500';
             } finally {
-                status.classList.add('hidden');
+                submitButton.disabled = false;
+                submitButton.textContent = 'Verwerken';
+                clearInterval(progressInterval);
+                processingAnimation.classList.add('hidden');
             }
         });
+    });
     </script>
 </body>
 </html>

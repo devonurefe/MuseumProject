@@ -57,9 +57,11 @@ class PDFProcessor:
         return logging.getLogger()
 
     @staticmethod
-    def generate_filename(year: str, number: str, start_page: int, end_page: int) -> str:
+    def generate_filename(year: str, number: str, range_str: str) -> str:
         """Standart dosya adı oluştur"""
-        return f"{year}{number.zfill(2)}{str(start_page).zfill(2)}{str(end_page).zfill(2)}"
+        # range_str içindeki '-' işaretini kaldırıp birleştir
+        start, end = range_str.split('-')
+        return f"{year}{number.zfill(2)}{start.zfill(2)}{end.zfill(2)}"
 
     def compress_pdf(self, input_pdf: str) -> str:
         """PDF dosyasını sıkıştır"""
@@ -75,38 +77,87 @@ class PDFProcessor:
     def process_pdf(self, input_pdf: str, pages_to_remove: List[int] = None,
                     article_ranges: List[List[int]] = None, merge_ranges: List[Tuple[int, int]] = None,
                     merge_article_indices: List[int] = None, year: str = None, number: str = None) -> Dict[str, List[str]]:
-        """PDF işleme ana metodu"""
         try:
             base_path = self.create_output_folders(year, number)
             self.logger = self.setup_logging(base_path)
             self.logger.info(
                 f"PDF işleme başladı: {os.path.basename(input_pdf)}")
 
-            compressed_pdf_path = self.compress_pdf(input_pdf)
-            reader = PdfReader(compressed_pdf_path)
+            reader = PdfReader(input_pdf)
+            total_pages = len(reader.pages)
 
-            if merge_article_indices and article_ranges:
-                article_ranges = self._merge_articles(
-                    article_ranges, merge_article_indices)
+            if total_pages == 0:
+                raise ValueError("PDF dosyası boş veya okunamıyor")
 
-            if merge_ranges:
-                return self._process_with_merges(reader, year, number, merge_ranges, base_path)
+            outputs = {'pdf': [], 'small': [], 'large': [], 'ocr': []}
 
+            # 1. Önce makale aralıklarını doğrula
             if article_ranges:
-                return self._process_articles(reader, year, number, article_ranges, pages_to_remove or [], base_path)
+                validated_ranges = []
+                for page_range in article_ranges:
+                    if all(1 <= p <= total_pages for p in page_range):
+                        validated_ranges.append(page_range)
+                    else:
+                        self.logger.warning(
+                            f"Geçersiz sayfa aralığı atlandı: {page_range}")
+                article_ranges = validated_ranges
 
-            return self._process_single_pages(reader, year, number, pages_to_remove or [], base_path)
+                # 2. Eğer birleştirme indeksleri varsa, makaleleri birleştir
+                if merge_article_indices:
+                    article_ranges = self._merge_articles(
+                        article_ranges, merge_article_indices)
+
+                # 3. Her makale aralığı için işlem yap
+                for page_range in article_ranges:
+                    writer = PdfWriter()
+
+                    # Aralıktaki sayfaları ekle (istenmeyen sayfaları atlayarak)
+                    for page_num in page_range:
+                        if not pages_to_remove or page_num not in pages_to_remove:
+                            writer.add_page(reader.pages[page_num - 1])
+
+                    # Makaleyi kaydet
+                    range_str = f"{min(page_range)}-{max(page_range)}"
+                    file_base_name = self.generate_filename(
+                        year, number, range_str)
+                    outputs.update(self._save_outputs(
+                        writer, file_base_name, base_path))
+
+            return outputs
 
         except Exception as e:
             self.logger.error(f"PDF işleme hatası: {str(e)}")
             raise
 
     def _merge_articles(self, article_ranges: List[List[int]], merge_indices: List[int]) -> List[List[int]]:
-        """Makale aralıklarını birleştir"""
-        idx1, idx2 = merge_indices
-        merged_range = list(range(min(article_ranges[idx1][0], article_ranges[idx2][0]),
-                                  max(article_ranges[idx1][-1], article_ranges[idx2][-1]) + 1))
-        return [range_item for i, range_item in enumerate(article_ranges) if i not in merge_indices] + [merged_range]
+        if not merge_indices or len(merge_indices) < 2:
+            return article_ranges
+
+        # Geçerli indeksleri kontrol et (1-tabanlı indeksler)
+        valid_indices = sorted(
+            [i for i in merge_indices if 1 <= i <= len(article_ranges)])
+        if len(valid_indices) < 2:
+            return article_ranges
+
+        # Birleştirilecek makaleleri al
+        all_pages = []
+        merged_indices = set()  # Birleştirilen indeksleri takip et
+        for i in valid_indices:
+            all_pages.extend(article_ranges[i-1])
+            merged_indices.add(i-1)
+
+        # Yeni birleştirilmiş aralık
+        merged_range = sorted(all_pages)
+
+        # Sonuç listesini oluştur
+        result = []
+        for i in range(len(article_ranges)):
+            if i == valid_indices[0] - 1:  # İlk birleştirme indeksine geldiğimizde
+                result.append(merged_range)
+            elif i not in merged_indices:  # Birleştirilmeyen makaleleri ekle
+                result.append(article_ranges[i])
+
+        return result
 
     def _process_with_merges(self, reader: PdfReader, year: str, number: str,
                              merge_ranges: List[Tuple[int, int]], base_path: Path) -> Dict[str, List[str]]:
@@ -158,7 +209,14 @@ class PDFProcessor:
                 first_image.save(str(large_path), 'JPEG')
                 outputs['large'].append(str(large_path))
 
-                ocr_text = pytesseract.image_to_string(first_image, lang='nld')
+                try:
+                    ocr_text = pytesseract.image_to_string(
+                        first_image, lang='nld')
+                except pytesseract.TesseractError:
+                    self.logger.warning(
+                        "Hollandaca dil paketi bulunamadı. İngilizce kullanılıyor.")
+                    ocr_text = pytesseract.image_to_string(
+                        first_image, lang='eng')
                 ocr_path = base_path / 'ocr' / f"{file_base_name}.txt"
                 with open(ocr_path, 'w', encoding='utf-8') as ocr_file:
                     ocr_file.write(ocr_text)

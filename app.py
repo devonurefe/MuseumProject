@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 import os
 from werkzeug.utils import secure_filename
 from pdf_processor import PDFProcessor
@@ -26,82 +26,105 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-@app.route('/')
+def process_uploaded_file(file):
+    """Yüklenen dosyayı işle ve sonucu döndür"""
+    if file and allowed_file(file.filename):
+        return render_template('index.html', success=True)
+    return render_template('index.html', error='Niet-toegestaan bestandstype')
+
+
+@app.route('/', methods=['GET', 'POST'])
 def index():
-    print("Working Directory:", os.getcwd())
-    print("Templates path:", os.path.join(os.getcwd(), 'templates'))
-    print("Index.html exists:", os.path.exists(
-        os.path.join(os.getcwd(), 'templates', 'index.html')))
+    if request.method == 'POST':
+        try:
+            if 'pdf_file' not in request.files:
+                return render_template('index.html', error='Geen bestand geselecteerd')
+
+            file = request.files['pdf_file']
+            if file.filename == '':
+                return render_template('index.html', error='Geen bestand geselecteerd')
+
+            if not file.filename.endswith('.pdf'):
+                return render_template('index.html', error='Alleen PDF-bestanden zijn toegestaan')
+
+            return upload_file()  # upload_file fonksiyonunu çağır
+
+        except Exception as e:
+            return render_template('index.html', error=f'Verwerkingsfout: {str(e)}')
+
     return render_template('index.html')
 
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    if 'file' not in request.files:
+    if 'pdf_file' not in request.files:
         return jsonify({'error': 'Geen bestand geüpload'}), 400
 
-    file = request.files['file']
+    file = request.files['pdf_file']
     if file.filename == '':
         return jsonify({'error': 'Geen bestand geselecteerd'}), 400
 
     if file and allowed_file(file.filename):
-        # Geçici dosya oluştur
         try:
             with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
                 file.save(temp_file.name)
                 filepath = temp_file.name
-        except Exception as e:
-            return jsonify({'error': f'Fout bij het opslaan van het bestand: {str(e)}'}), 500
 
-        try:
-            # Form verilerini işle
-            remove_pages = [int(x.strip()) for x in request.form.get(
-                'remove_pages', '').split(',') if x.strip()]
+            # Form verilerini al
+            article_ranges_str = request.form.get('article_ranges', '')
+            remove_pages_str = request.form.get('remove_pages', '')
+            article_ranges = []
+            remove_pages = []
+
+            # Silinecek sayfaları işle
+            if remove_pages_str:
+                remove_pages = [int(x.strip())
+                                for x in remove_pages_str.split(',') if x.strip()]
 
             # Makale aralıklarını işle
-            article_ranges = []
-            if request.form.get('article_ranges'):
-                for range_str in request.form.get('article_ranges').split(','):
-                    if '-' in range_str:
-                        start, end = map(int, range_str.strip().split('-'))
+            if article_ranges_str:
+                ranges = article_ranges_str.split(',')
+                for r in ranges:
+                    if '-' in r:
+                        start, end = map(int, r.split('-'))
                         article_ranges.append(list(range(start, end + 1)))
-
-            merge_ranges = None
-            merge_article_indices = None
-
-            merge_str = request.form.get('merge_pages', '').strip()
-            if merge_str:
-                try:
-                    page1, page2 = map(int, merge_str.split(','))
-                    if article_ranges:
-                        merge_article_indices = [page1-1, page2-1]
                     else:
-                        merge_ranges = [(min(page1, page2), max(page1, page2))]
-                except ValueError:
-                    return jsonify({'error': 'Ongeldige invoer voor samenvoegen'}), 400
+                        article_ranges.append([int(r)])
 
-            # Yıl ve sayı bilgilerini al
             year = request.form.get('year')
             number = request.form.get('number', '')
 
+            # Makale birleştirme indekslerini işle
+            merge_ranges_str = request.form.get('merge_ranges', '').strip()
+            merge_article_indices = None
+            if merge_ranges_str:
+                try:
+                    # String'i integer listesine çevir ve 1-tabanlı indeksleri koru
+                    merge_article_indices = [
+                        int(x.strip()) for x in merge_ranges_str.split(',') if x.strip()]
+                    if len(merge_article_indices) < 2:
+                        raise ValueError("En az iki makale indeksi gerekli")
+                except ValueError as e:
+                    return jsonify({'error': 'Geçersiz birleştirme indeksleri'}), 400
+
             # PDF'i işle
-            outputs = pdf_processor.process_pdf(
+            output_files = pdf_processor.process_pdf(
                 input_pdf=filepath,
                 pages_to_remove=remove_pages,
                 article_ranges=article_ranges,
-                merge_ranges=merge_ranges,
-                merge_article_indices=merge_article_indices,
+                merge_article_indices=merge_article_indices,  # Birleştirilecek makale indeksleri
                 year=year,
                 number=number
             )
 
-            # Downloads klasör yolunu al
-            output_path = pdf_processor.create_output_folders(year, number)
+            download_path = os.path.join(
+                os.path.expanduser('~'), 'Downloads', 'museumproject')
 
             return jsonify({
                 'success': True,
                 'message': 'Bestand succesvol verwerkt',
-                'outputPath': str(output_path)
+                'files': output_files,
+                'download_location': download_path
             })
 
         except Exception as e:
@@ -111,6 +134,25 @@ def upload_file():
                 os.remove(filepath)
 
     return jsonify({'error': 'Niet-toegestaan bestandstype'}), 400
+
+
+# Dosya indirme route'u ekleyelim
+@app.route('/download/<path:filename>')
+def download_file(filename):
+    try:
+        # Güvenli dosya yolu oluştur
+        safe_path = os.path.join(app.config['OUTPUT_FOLDER'], filename)
+        directory = os.path.dirname(safe_path)
+        filename = os.path.basename(safe_path)
+
+        # Dosyayı indirme
+        return send_from_directory(
+            directory,
+            filename,
+            as_attachment=True  # Tarayıcıda indirme dialogu gösterir
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 404
 
 
 if __name__ == '__main__':
