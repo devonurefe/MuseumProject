@@ -52,23 +52,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusDiv.textContent = 'Bestand succesvol verwerkt!';
                 statusDiv.className = 'mt-4 text-green-500';
                 
-                if (result.files) {
-                    const downloadLinks = document.getElementById('downloadLinks');
-                    downloadLinks.innerHTML = '<h3 class="text-sm font-medium text-gray-700 mb-2">Download bestanden:</h3>';
-                    
-                    Object.entries(result.files).forEach(([type, files]) => {
-                        files.forEach(file => {
-                            const link = document.createElement('a');
-                            link.href = `data:application/octet-stream;base64,${file.data}`;
-                            link.download = file.name;
-                            link.className = 'bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-2 mb-2 inline-block';
-                            link.textContent = `Download ${file.name}`;
-                            downloadLinks.appendChild(link);
-                        });
-                    });
-                    
-                    document.getElementById('result').classList.remove('hidden');
-                }
+                const downloadLinks = document.getElementById('downloadLinks');
+                downloadLinks.innerHTML = `
+                    <div class="text-center p-4">
+                        <a href="data:application/zip;base64,${result.zip_file.data}" 
+                           download="${result.zip_file.name}"
+                           class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded inline-flex items-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                            </svg>
+                            Download Output Folder (${result.zip_file.name})
+                        </a>
+                    </div>
+                `;
+                
+                document.getElementById('result').classList.remove('hidden');
             } else {
                 throw new Error(result.error || 'Er is een fout opgetreden');
             }

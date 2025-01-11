@@ -4,6 +4,8 @@ from werkzeug.utils import secure_filename
 from pdf_processor import PDFProcessor
 import tempfile
 import base64
+import zipfile
+import io
 
 # Absolute path kullanarak template_folder'ı belirtelim
 template_dir = os.path.abspath(os.path.join(
@@ -118,23 +120,26 @@ def upload_file():
                 number=number
             )
 
-            # Geçici dosyaları base64'e çevir
-            file_contents = {}
-            for file_type, file_list in output_files.items():
-                file_contents[file_type] = []
-                for file_path in file_list:
-                    with open(file_path, 'rb') as f:
-                        content = f.read()
-                        filename = os.path.basename(file_path)
-                        file_contents[file_type].append({
-                            'name': filename,
-                            'data': base64.b64encode(content).decode('utf-8')
-                        })
+            # Tüm çıktıları zip dosyasına ekle
+            memory_file = io.BytesIO()
+            with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+                # Her dosya türü için ayrı klasör oluştur
+                for file_type, file_list in output_files.items():
+                    for file_path in file_list:
+                        # Zip içindeki yol: output202001/pdf/202001xxx.pdf gibi
+                        arcname = f"output{year}{number}/{file_type}/{os.path.basename(file_path)}"
+                        zf.write(file_path, arcname)
+
+            memory_file.seek(0)
+            zip_data = base64.b64encode(memory_file.getvalue()).decode('utf-8')
 
             return jsonify({
                 'success': True,
                 'message': 'Bestand succesvol verwerkt',
-                'files': file_contents
+                'zip_file': {
+                    'name': f'output{year}{number}.zip',
+                    'data': zip_data
+                }
             })
 
         except Exception as e:
