@@ -124,7 +124,7 @@ class PDFProcessor:
                         writer, file_base_name, base_path))
 
             return outputs
-
+    # Birleştirme aralıklarını işle
         except Exception as e:
             self.logger.error(f"PDF işleme hatası: {str(e)}")
             raise

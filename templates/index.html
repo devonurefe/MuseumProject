@@ -207,22 +207,15 @@
                     statusDiv.textContent = 'Bestand succesvol verwerkt!';
                     statusDiv.className = 'mt-4 text-green-500';
                     
-                    // İndirme konumunu göster
-                    const downloadLocation = document.getElementById('downloadLocation');
-                    downloadLocation.innerHTML = `
-                        <strong>Bestanden opgeslagen in:</strong><br>
-                        ${result.download_location}<br>
-                        <small class="text-gray-500">(De bestanden worden automatisch naar deze map gedownload)</small>
-                    `;
-                    
                     if (result.files && result.files.length > 0) {
                         const downloadLinks = document.getElementById('downloadLinks');
-                        downloadLinks.innerHTML = '';
+                        downloadLinks.innerHTML = '<h3 class="text-sm font-medium text-gray-700 mb-2">Download bestanden:</h3>';
                         
                         result.files.forEach(file => {
                             const link = document.createElement('a');
                             link.href = `/download/${encodeURIComponent(file)}`;
                             link.className = 'bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-2 mb-2 inline-block';
+                            link.download = file.split('/').pop();  // Dosyayı indir
                             link.textContent = `Download ${file.split('/').pop()}`;
                             downloadLinks.appendChild(link);
                         });

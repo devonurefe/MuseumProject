@@ -112,19 +112,16 @@ def upload_file():
                 input_pdf=filepath,
                 pages_to_remove=remove_pages,
                 article_ranges=article_ranges,
-                merge_article_indices=merge_article_indices,  # Birleştirilecek makale indeksleri
+                merge_article_indices=merge_article_indices,
                 year=year,
                 number=number
             )
-
-            download_path = os.path.join(
-                os.path.expanduser('~'), 'Downloads', 'museumproject')
 
             return jsonify({
                 'success': True,
                 'message': 'Bestand succesvol verwerkt',
                 'files': output_files,
-                'download_location': download_path
+                'download_ready': True
             })
 
         except Exception as e:
@@ -140,16 +137,16 @@ def upload_file():
 @app.route('/download/<path:filename>')
 def download_file(filename):
     try:
-        # Güvenli dosya yolu oluştur
-        safe_path = os.path.join(app.config['OUTPUT_FOLDER'], filename)
-        directory = os.path.dirname(safe_path)
-        filename = os.path.basename(safe_path)
+        # Downloads klasöründen dosyayı al
+        downloads_folder = os.path.join(
+            os.path.expanduser('~'), 'Downloads', 'museumproject')
+        directory = os.path.dirname(os.path.join(downloads_folder, filename))
+        filename = os.path.basename(filename)
 
-        # Dosyayı indirme
         return send_from_directory(
             directory,
             filename,
-            as_attachment=True  # Tarayıcıda indirme dialogu gösterir
+            as_attachment=True
         )
     except Exception as e:
         return jsonify({'error': str(e)}), 404
