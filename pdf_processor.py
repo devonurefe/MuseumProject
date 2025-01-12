@@ -70,8 +70,8 @@ class PDFProcessor:
         return output_pdf
 
     def process_pdf(self, input_pdf: str, pages_to_remove: List[int] = None,
-                    article_ranges: List[List[int]] = None, merge_ranges: List[Tuple[int, int]] = None,
-                    merge_article_indices: List[int] = None, year: str = None, number: str = None) -> Dict[str, List[str]]:
+                    article_ranges: List[List[int]] = None, merge_article_indices: List[int] = None,
+                    year: str = None, number: str = None) -> Dict[str, List[str]]:
         try:
             base_path = self.create_output_folders()
             self.logger = self.setup_logging(base_path)
@@ -102,24 +102,28 @@ class PDFProcessor:
                     article_ranges = self._merge_articles(
                         article_ranges, merge_article_indices)
 
-                # 3. Her makale aralığı için işlem yap
-                for page_range in article_ranges:
+                # 3. Her makale aralığı için ayrı işlem yap
+                for i, page_range in enumerate(article_ranges, 1):
                     writer = PdfWriter()
 
-                    # Aralıktaki sayfaları ekle (istenmeyen sayfaları atlayarak)
+                    # Sayfaları ekle (silinecek sayfaları atla)
                     for page_num in page_range:
                         if not pages_to_remove or page_num not in pages_to_remove:
                             writer.add_page(reader.pages[page_num - 1])
 
-                    # Makaleyi kaydet
+                    # Her makale için ayrı dosya oluştur
                     range_str = f"{min(page_range)}-{max(page_range)}"
                     file_base_name = self.generate_filename(
                         year, number, range_str)
-                    outputs.update(self._save_outputs(
-                        writer, file_base_name, base_path))
+
+                    # Çıktıları ana listeye ekle
+                    article_outputs = self._save_outputs(
+                        writer, file_base_name, base_path)
+                    for key in outputs:
+                        outputs[key].extend(article_outputs[key])
 
             return outputs
-    # Birleştirme aralıklarını işle
+
         except Exception as e:
             self.logger.error(f"PDF işleme hatası: {str(e)}")
             raise
