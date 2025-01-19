@@ -1,58 +1,61 @@
+// main.js güncellemesi
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('uploadForm');
-    const statusDiv = document.getElementById('status');
-    const processingAnimation = document.querySelector('.processing-animation');
-    const steps = document.querySelectorAll('.step');
     const submitButton = form.querySelector('button[type="submit"]');
-    let currentStep = 0;
-
-    function updateProgress() {
-        steps.forEach((step, index) => {
-            if (index === currentStep) {
-                step.classList.add('active');
-            } else {
-                step.classList.remove('active');
-            }
-        });
-        currentStep = (currentStep + 1) % steps.length;
+    const resultDiv = document.getElementById('result');
+    const downloadLocation = document.getElementById('downloadLocation');
+    const downloadLinks = document.getElementById('downloadLinks');
+    
+    // Form reset fonksiyonu
+    function resetForm() {
+        form.reset();
+        resultDiv.classList.add('hidden');
+        downloadLocation.innerHTML = '';
+        downloadLinks.innerHTML = '';
+        submitButton.disabled = false;
+        submitButton.querySelector('span').textContent = 'Verwerken';
+        const progressBar = submitButton.querySelector('.progress-bar');
+        if (progressBar) {
+            progressBar.style.width = '0%';
+        }
     }
 
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
+
+        const progressBar = submitButton.querySelector('.progress-bar');
+        progressBar.style.width = '0%';
         
-        // Her yeni işlemde önceki sonuçları ve mesajları temizle
-        statusDiv.textContent = '';
-        statusDiv.className = '';
-        document.getElementById('result').classList.add('hidden');
-        document.getElementById('downloadLocation').innerHTML = '';
-        document.getElementById('downloadLinks').innerHTML = '';
+        // Animasyon başlangıcı
+        submitButton.classList.add('processing');
+        submitButton.querySelector('span').textContent = 'Verwerking...';
         
-        // Animasyonu göster
-        processingAnimation.classList.remove('hidden');
-        currentStep = 0; // Animasyonu baştan başlat
-        updateProgress(); // İlk adımı hemen göster
-        
-        // İlerleme animasyonunu başlat
-        const progressInterval = setInterval(updateProgress, 2000);
-        
-        const formData = new FormData(this);
-        
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress = Math.min(progress + 5, 90); // Max 90% until complete
+            progressBar.style.width = `${progress}%`;
+        }, 200);
+
         try {
             submitButton.disabled = true;
-            submitButton.textContent = 'Verwerking...';
+            const formData = new FormData(form);
             
             const response = await fetch('/upload', {
                 method: 'POST',
                 body: formData
             });
-            
+
             const result = await response.json();
             
+            // İşlem tamamlandı, progress bar'ı 100% yap
+            clearInterval(progressInterval);
+            progressBar.style.width = '100%';
+
             if (result.success) {
-                statusDiv.textContent = 'Bestand succesvol verwerkt!';
-                statusDiv.className = 'mt-4 text-green-500';
-                
-                const downloadLinks = document.getElementById('downloadLinks');
+                downloadLocation.innerHTML = `
+                    <p class="text-green-500">${result.message}</p>
+                `;
+
                 downloadLinks.innerHTML = `
                     <div class="text-center p-4">
                         <a href="data:application/zip;base64,${result.zip_file.data}" 
@@ -61,23 +64,29 @@ document.addEventListener('DOMContentLoaded', function() {
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                             </svg>
-                            Download Output Folder (${result.zip_file.name})
+                            Download Output (${result.zip_file.name})
                         </a>
                     </div>
                 `;
-                
-                document.getElementById('result').classList.remove('hidden');
+
+                resultDiv.classList.remove('hidden');
             } else {
                 throw new Error(result.error || 'Er is een fout opgetreden');
             }
         } catch (error) {
-            statusDiv.textContent = `Fout: ${error.message}`;
-            statusDiv.className = 'mt-4 text-red-500';
+            downloadLocation.innerHTML = `
+                <p class="text-red-500">Fout: ${error.message}</p>
+            `;
+            resultDiv.classList.remove('hidden');
         } finally {
+            // Animasyonu kaldır ve butonu resetle
+            submitButton.classList.remove('processing');
             submitButton.disabled = false;
-            submitButton.textContent = 'Verwerken';
-            clearInterval(progressInterval);
-            processingAnimation.classList.add('hidden');
+            submitButton.querySelector('span').textContent = 'Verwerken';
+            
+            // Yeni bir dosya seçildiğinde formu resetle
+            const fileInput = form.querySelector('input[type="file"]');
+            fileInput.addEventListener('change', resetForm);
         }
     });
-}); 
+});

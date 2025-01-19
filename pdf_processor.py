@@ -58,16 +58,9 @@ class PDFProcessor:
         start, end = range_str.split('-')
         return f"{year}{number.zfill(2)}{start.zfill(2)}{end.zfill(2)}"
 
-    def compress_pdf(self, input_pdf: str) -> str:
-        """PDF dosyasını sıkıştır"""
-        output_pdf = tempfile.NamedTemporaryFile(
-            suffix='.pdf', delete=False).name
-        writer = PdfWriter()
-        for page in PdfReader(input_pdf).pages:
-            writer.add_page(page)
-        with open(output_pdf, 'wb') as pdf_file:
-            writer.write(pdf_file)
-        return output_pdf
+    def get_pdf_reader(self, input_pdf: str) -> PdfReader:
+        """PDF dosyasını oku ve PdfReader döndür"""
+        return PdfReader(input_pdf)
 
     def process_pdf(self, input_pdf: str, pages_to_remove: List[int] = None,
                     article_ranges: List[List[int]] = None, merge_article_indices: List[int] = None,
@@ -78,7 +71,7 @@ class PDFProcessor:
             self.logger.info(
                 f"PDF işleme başladı: {os.path.basename(input_pdf)}")
 
-            reader = PdfReader(input_pdf)
+            reader = self.get_pdf_reader(input_pdf)
             total_pages = len(reader.pages)
 
             if total_pages == 0:
@@ -86,41 +79,44 @@ class PDFProcessor:
 
             outputs = {'pdf': [], 'small': [], 'large': [], 'ocr': []}
 
+            # Eğer article_ranges boşsa, tüm sayfaları işle
+            if not article_ranges:
+                article_ranges = [[i + 1 for i in range(total_pages)]]
+
             # 1. Önce makale aralıklarını doğrula
-            if article_ranges:
-                validated_ranges = []
-                for page_range in article_ranges:
-                    if all(1 <= p <= total_pages for p in page_range):
-                        validated_ranges.append(page_range)
-                    else:
-                        self.logger.warning(
-                            f"Geçersiz sayfa aralığı atlandı: {page_range}")
-                article_ranges = validated_ranges
+            validated_ranges = []
+            for page_range in article_ranges:
+                if all(1 <= p <= total_pages for p in page_range):
+                    validated_ranges.append(page_range)
+                else:
+                    self.logger.warning(
+                        f"Geçersiz sayfa aralığı atlandı: {page_range}")
+            article_ranges = validated_ranges
 
-                # 2. Eğer birleştirme indeksleri varsa, makaleleri birleştir
-                if merge_article_indices:
-                    article_ranges = self._merge_articles(
-                        article_ranges, merge_article_indices)
+            # 2. Eğer birleştirme indeksleri varsa, makaleleri birleştir
+            if merge_article_indices:
+                article_ranges = self._merge_articles(
+                    article_ranges, merge_article_indices)
 
-                # 3. Her makale aralığı için ayrı işlem yap
-                for i, page_range in enumerate(article_ranges, 1):
-                    writer = PdfWriter()
+            # 3. Her makale aralığı için ayrı işlem yap
+            for i, page_range in enumerate(article_ranges, 1):
+                writer = PdfWriter()
 
-                    # Sayfaları ekle (silinecek sayfaları atla)
-                    for page_num in page_range:
-                        if not pages_to_remove or page_num not in pages_to_remove:
-                            writer.add_page(reader.pages[page_num - 1])
+                # Sayfaları ekle (silinecek sayfaları atla)
+                for page_num in page_range:
+                    if not pages_to_remove or page_num not in pages_to_remove:
+                        writer.add_page(reader.pages[page_num - 1])
 
-                    # Her makale için ayrı dosya oluştur
-                    range_str = f"{min(page_range)}-{max(page_range)}"
-                    file_base_name = self.generate_filename(
-                        year, number, range_str)
+                # Her makale için ayrı dosya oluştur
+                range_str = f"{min(page_range)}-{max(page_range)}"
+                file_base_name = self.generate_filename(
+                    year, number, range_str)
 
-                    # Çıktıları ana listeye ekle
-                    article_outputs = self._save_outputs(
-                        writer, file_base_name, base_path)
-                    for key in outputs:
-                        outputs[key].extend(article_outputs[key])
+                # Çıktıları ana listeye ekle
+                article_outputs = self._save_outputs(
+                    writer, file_base_name, base_path)
+                for key in outputs:
+                    outputs[key].extend(article_outputs[key])
 
             return outputs
 
@@ -157,35 +153,6 @@ class PDFProcessor:
                 result.append(article_ranges[i])
 
         return result
-
-    def _process_with_merges(self, reader: PdfReader, year: str, number: str,
-                             merge_ranges: List[Tuple[int, int]], base_path: Path) -> Dict[str, List[str]]:
-        """Birleştirme aralıklarını işle"""
-        outputs = {'pdf': [], 'small': [], 'large': [], 'ocr': []}
-        processed_pages = set()
-
-        for start_page, end_page in merge_ranges:
-            if 1 <= start_page <= len(reader.pages) and 1 <= end_page <= len(reader.pages):
-                writer = PdfWriter()
-                for page_num in range(start_page - 1, end_page):
-                    writer.add_page(reader.pages[page_num])
-                    processed_pages.add(page_num + 1)
-
-                file_base_name = self.generate_filename(
-                    year, number, start_page, end_page)
-                outputs.update(self._save_outputs(
-                    writer, file_base_name, base_path))
-
-        for page_num in range(len(reader.pages)):
-            if (page_num + 1) not in processed_pages:
-                writer = PdfWriter()
-                writer.add_page(reader.pages[page_num])
-                file_base_name = self.generate_filename(
-                    year, number, page_num + 1, page_num + 1)
-                outputs.update(self._save_outputs(
-                    writer, file_base_name, base_path))
-
-        return outputs
 
     def _save_outputs(self, writer: PdfWriter, file_base_name: str, base_path: Path) -> Dict[str, List[str]]:
         """PDF, görüntü ve OCR çıktılarını kaydet"""
@@ -224,34 +191,4 @@ class PDFProcessor:
             self.logger.error(
                 f"Dosya işleme hatası {file_base_name}: {str(e)}")
             raise
-        return outputs
-
-    def _process_articles(self, reader: PdfReader, year: str, number: str,
-                          article_ranges: List[List[int]], pages_to_remove: List[int],
-                          base_path: Path) -> Dict[str, List[str]]:
-        """Makale aralıklarını işle"""
-        outputs = {'pdf': [], 'small': [], 'large': [], 'ocr': []}
-        for article_pages in article_ranges:
-            writer = PdfWriter()
-            for page_num in article_pages:
-                if page_num not in pages_to_remove:
-                    writer.add_page(reader.pages[page_num - 1])
-            file_base_name = self.generate_filename(
-                year, number, min(article_pages), max(article_pages))
-            outputs.update(self._save_outputs(
-                writer, file_base_name, base_path))
-        return outputs
-
-    def _process_single_pages(self, reader: PdfReader, year: str, number: str,
-                              pages_to_remove: List[int], base_path: Path) -> Dict[str, List[str]]:
-        """Tek sayfaları işle"""
-        outputs = {'pdf': [], 'small': [], 'large': [], 'ocr': []}
-        for page_num in range(len(reader.pages)):
-            if (page_num + 1) not in pages_to_remove:
-                writer = PdfWriter()
-                writer.add_page(reader.pages[page_num])
-                file_base_name = self.generate_filename(
-                    year, number, page_num + 1, page_num + 1)
-                outputs.update(self._save_outputs(
-                    writer, file_base_name, base_path))
         return outputs

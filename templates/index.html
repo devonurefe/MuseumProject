@@ -84,36 +84,25 @@
                        placeholder="bijv. 1,2,3">
             </div>
 
-            <button type="submit" 
-                    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                Verwerken
+            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline relative overflow-hidden">
+                <span class="relative z-10">Verwerken</span>
+                <div class="progress-bar absolute bottom-0 left-0 h-1 bg-blue-300" style="width: 0%;"></div>
             </button>
         </form>
-
-        <div id="status" class="mt-4">
-            <div class="processing-animation hidden">
-                <div class="spinner"></div>
-                <p class="processing-text">Verwerking bezig...</p>
-                <div class="progress-steps">
-                    <div class="step">PDF voorbereiden</div>
-                    <div class="step">Pagina's verwerken</div>
-                    <div class="step">OCR uitvoeren</div>
-                    <div class="step">Bestanden opslaan</div>
-                </div>
-            </div>
-        </div>
 
         <div id="result" class="mt-6 hidden">
             <h2 class="text-lg font-semibold mb-2">Verwerkingsresultaten:</h2>
             
             <div class="bg-gray-50 p-4 rounded-lg mb-4">
-                <h3 class="text-sm font-medium text-gray-700">Download locatie:</h3>
-                <p id="downloadLocation" class="text-sm text-gray-600 break-all"></p>
+                <div id="downloadLocation"></div>
             </div>
             
             <div id="downloadLinks" class="space-y-2"></div>
         </div>
     </div>
+    <footer class="text-center mt-8">
+        <p class="text-gray-500 text-sm">Powered by <strong>h2O</strong></p>
+    </footer>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
