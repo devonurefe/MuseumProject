@@ -10,19 +10,19 @@ import webbrowser
 import threading
 import re
 
-# Absolute path kullanarak template_folder'ı belirtelim
+# Geef template_map op met absoluut pad
 template_dir = os.path.abspath(os.path.join(
     os.path.dirname(__file__), 'templates'))
 static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'static'))
 
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 
-# Max content length ayarı
+# Max content length
 app.config['MAX_CONTENT_LENGTH'] = 40 * 1024 * 1024  # 40MB max-limit
 
 ALLOWED_EXTENSIONS = {'pdf'}
 
-# PDF işlemci örneği oluştur
+# PDF voorbeeld
 pdf_processor = PDFProcessor()
 
 
@@ -31,7 +31,7 @@ def allowed_file(filename):
 
 
 def validate_year(year):
-    """Yıl değerini doğrula"""
+    """Jaarwaarde controleren"""
     if not year:
         return False, "Voer een geldig jaar in"
     if not re.match(r'^\d{4}$', year):
@@ -40,7 +40,7 @@ def validate_year(year):
 
 
 def validate_number(number):
-    """Sayı değerini doğrula"""
+    """Valideer de getalwaarde"""
     if not number:
         return False, "Voer een geldig nummer in"
     if not re.match(r'^\d{1,2}$', number):
@@ -49,7 +49,7 @@ def validate_number(number):
 
 
 def process_ranges(ranges_str, max_pages):
-    """Sayfa aralıklarını işle"""
+    """Paginabereiken verwerken"""
     if not ranges_str:
         return [[i + 1 for i in range(max_pages)]]
 
@@ -74,7 +74,7 @@ def process_ranges(ranges_str, max_pages):
 
 
 def process_remove_pages(remove_str, max_pages):
-    """Silinecek sayfaları işle"""
+    """Te verwijderen procespagina's"""
     if not remove_str:
         return []
 
@@ -89,7 +89,7 @@ def process_remove_pages(remove_str, max_pages):
 
 
 def process_merge_indices(merge_str):
-    """Birleştirme indekslerini işle"""
+    """Samengevoegde indexen verwerken"""
     if not merge_str:
         return None
 
@@ -135,7 +135,7 @@ def upload_file():
         if file.filename == '':
             return jsonify({'error': 'Er is geen bestand geselecteerd'}), 400
 
-        # Yıl ve numara doğrulama
+        # Jaar- en nummercontrole
         year = request.form.get('year', '')
         number = request.form.get('number', '')
 
@@ -149,17 +149,17 @@ def upload_file():
 
         if file and allowed_file(file.filename):
             try:
-                # Geçici dosya oluştur
+                # Tijdelijk bestand maken
                 with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
                     file.save(temp_file.name)
                     filepath = temp_file.name
 
-                    # PDF okuyucu oluştur ve sayfa sayısını al
+                    # PDF-lezer maken en paginatelling krijgen
                     reader = pdf_processor.get_pdf_reader(filepath)
                     total_pages = len(reader.pages)
 
                     try:
-                        # Form verilerini işle
+                        # Formuliergegevens verwerken
                         article_ranges = process_ranges(
                             request.form.get('article_ranges', ''), total_pages)
                         remove_pages = process_remove_pages(
@@ -169,7 +169,7 @@ def upload_file():
                     except ValueError as e:
                         return jsonify({'error': str(e)}), 400
 
-                    # PDF'i işle
+                    # PProces PDF
                     output_files = pdf_processor.process_pdf(
                         input_pdf=filepath,
                         pages_to_remove=remove_pages,
@@ -179,7 +179,7 @@ def upload_file():
                         number=number
                     )
 
-                    # ZIP dosyası oluştur
+                    # ZIP files
                     memory_file = io.BytesIO()
                     with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
                         for file_type, file_list in output_files.items():
@@ -246,9 +246,9 @@ def open_browser():
 
 
 if __name__ == '__main__':
-    # Tarayıcıyı otomatik aç
+    # De browser automatisch openen
     threading.Timer(1, open_browser).start()
 
-    # Flask uygulamasını çalıştır
+    # De Flask-toepassing uitvoeren
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)

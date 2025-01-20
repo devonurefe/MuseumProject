@@ -1,38 +1,27 @@
-#define MyAppName "PDF Museum Tool"
-#define MyAppVersion "1.0.0"
+#define MyAppName "Museum PDF Tool"
+#define MyAppVersion "1.0"
 #define MyAppPublisher "h2O"
-#define MyAppExeName "PDF Museum Tool.exe"
+#define MyAppExeName "MuseumPDFTool.exe" ; PyInstaller tarafından oluşturulan exe dosyası
 
 [Setup]
-AppId={YOUR-GUID-HERE}
+AppId={{b0cc991c-2631-43a2-82ef-9ce21792c364}}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 OutputDir=Output
-OutputBaseFilename=PDF_Museum_Tool_Setup
-SetupIconFile=app.ico
-Compression=lzma2/ultra64
-SolidCompression=yes
+OutputBaseFilename=Setup_{#MyAppName}
 PrivilegesRequired=admin
-; Tesseract gereksinim kontrolü
-InfoBeforeFile=requirements.txt
-
-[Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "dutch"; MessagesFile: "compiler:Languages\Dutch.isl"
-
-[Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
-; Ana uygulama
-Source: "dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "C:\Users\koris\Documents\MuseumProject\dist\MuseumPDFTool\MuseumPDFTool.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "static\*"; DestDir: "{app}\static"; Flags: ignoreversion recursesubdirs
+Source: "templates\*"; DestDir: "{app}\templates"; Flags: ignoreversion recursesubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}";
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent

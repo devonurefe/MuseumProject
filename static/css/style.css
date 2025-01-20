@@ -1,7 +1,7 @@
-/* style.css güncellemesi */
+/* style.css */
 .progress-bar {
     height: 4px;
-    background-color: #60a5fa;
+    background-color: #1975e5;
     transition: width 0.3s ease-in-out;
     position: absolute;
     bottom: 0;
@@ -16,8 +16,8 @@ button[type="submit"] {
 }
 
 button[type="submit"].processing {
-    width: 200px;
-    background-color: #4a90e2;
+    width: 600px;
+    background-color: #000000;
 }
 
 button[type="submit"]:disabled {
@@ -37,7 +37,7 @@ footer {
     border-top: 1px solid #e5e7eb;
 }
 
-/* Animasyon için yeni stiller */
+/* Animasyon */
 @keyframes pulse {
     0% { transform: scale(1); }
     50% { transform: scale(1.05); }

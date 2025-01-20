@@ -1,4 +1,3 @@
-// main.js güncellemesi
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('uploadForm');
     const submitButton = form.querySelector('button[type="submit"]');
@@ -47,7 +46,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const result = await response.json();
             
-            // İşlem tamamlandı, progress bar'ı 100% yap
+            // progress bar'ı 100% 
             clearInterval(progressInterval);
             progressBar.style.width = '100%';
 

@@ -10,14 +10,14 @@ def get_tesseract_path():
     """Sistemdeki Tesseract yolunu belirle"""
     if sys.platform == "win32":
         return r"C:\Program Files\Tesseract-OCR"
-    return "/usr/local/bin"  # Mac için varsayılan
+    return "/usr/local/bin"  # Mac voor
 
 
 def get_poppler_path():
     """Sistemdeki Poppler yolunu belirle"""
     if sys.platform == "win32":
         return r"C:\Program Files\poppler-23.11.0\Library\bin"
-    return "/usr/local/bin"  # Mac için varsayılan
+    return "/usr/local/bin"  # Mac voor
 
 
 def create_build_folders():
@@ -28,13 +28,13 @@ def create_build_folders():
 
 def copy_dependencies():
     """Bağımlılıkları kopyala"""
-    # Tesseract ve dil dosyalarını kopyala
+    # Tesseract and lang bestanden copy
     tesseract_path = get_tesseract_path()
     if sys.platform == "win32":
         shutil.copytree(tesseract_path, "build/tesseract",
                         dirs_exist_ok=True)
 
-    # Poppler dosyalarını kopyala
+    # Poppler copy
     poppler_path = get_poppler_path()
     if sys.platform == "win32":
         shutil.copytree(poppler_path, "build/poppler",
@@ -51,7 +51,8 @@ added_files = [
     ('templates', 'templates'),
     ('static', 'static'),
     ('build/tesseract', 'tesseract'),
-    ('build/poppler', 'poppler')
+    ('build/poppler', 'poppler'),
+    ('app.ico', '.')  # app.ico dosyasını kök dizine ekleyin
 ]
 
 a = Analysis(
@@ -92,7 +93,8 @@ exe = EXE(
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
-    entitlements_file=None
+    entitlements_file=None,
+    icon='app.ico'  # Ikon dosyasının yolu
 )
 
 coll = COLLECT(
@@ -110,25 +112,25 @@ coll = COLLECT(
     with open("museumapp.spec", "w") as f:
         f.write(spec_content)
 
-    # PyInstaller'ı çalıştır
+    # PyInstaller run
     subprocess.run(["pyinstaller", "--noconfirm", "museumapp.spec"])
 
 
 def create_launcher():
-    """Başlatıcı script oluştur"""
+    """Een script voor het starten maken"""
     launcher_content = """import os
 import sys
 
 def setup_environment():
-    # Uygulama dizinini belirle
+    # De toepassingsmap bepalen
     base_path = getattr(sys, '_MEIPASS', os.path.abspath(os.path.dirname(__file__)))
     
-    # Tesseract yolunu ayarla
+    # Pas het pad van de vlakvulling aan
     tesseract_path = os.path.join(base_path, 'tesseract')
     os.environ['PATH'] = tesseract_path + os.pathsep + os.environ.get('PATH', '')
     os.environ['TESSDATA_PREFIX'] = os.path.join(tesseract_path, 'tessdata')
     
-    # Poppler yolunu ayarla
+    # 
     poppler_path = os.path.join(base_path, 'poppler')
     os.environ['PATH'] = poppler_path + os.pathsep + os.environ.get('PATH', '')
 
@@ -143,7 +145,7 @@ if __name__ == '__main__':
 
 
 def main():
-    """Ana build işlemi"""
+    """Hoofdbouwproces"""
     try:
         print("Build işlemi başlıyor...")
         create_build_folders()
@@ -155,12 +157,12 @@ def main():
         create_launcher()
         print("Build işlemi tamamlandı!")
 
-        # Dist klasörünü zip'le
+        # Dist map zip
         shutil.make_archive("MuseumPDFTool", "zip", "dist/MuseumPDFTool")
-        print("Zip dosyası oluşturuldu: MuseumPDFTool.zip")
+        print("Zip-bestand gemaakt: MuseumPDFTool.zip")
 
     except Exception as e:
-        print(f"Hata oluştu: {str(e)}")
+        print(f": {str(e)}")
         sys.exit(1)
 
 

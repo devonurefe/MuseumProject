@@ -45,11 +45,18 @@ class PDFProcessor:
         return base_path
 
     def setup_logging(self, base_path: Path) -> logging.Logger:
-        """Logging ayarlarını yapar"""
+        """Logging ayarlarını yapar ve Hollandaca log mesajları ekler"""
         log_file = base_path / 'log' / f"{datetime.now():%Y%m%d_%H%M%S}.log"
         logging.basicConfig(filename=log_file, level=logging.INFO,
                             format='%(asctime)s - %(levelname)s - %(message)s')
-        return logging.getLogger()
+        logger = logging.getLogger()
+
+        # Hollandaca log mesajları
+        logger.info("PDF işleme başladı.")
+        logger.info(f"Geçici klasör oluşturuldu: {base_path}")
+        logger.info("PDF, OCR, small, large ve log klasörleri oluşturuldu.")
+
+        return logger
 
     @staticmethod
     def generate_filename(year: str, number: str, range_str: str) -> str:
@@ -79,11 +86,10 @@ class PDFProcessor:
 
             outputs = {'pdf': [], 'small': [], 'large': [], 'ocr': []}
 
-            # Eğer article_ranges boşsa, tüm sayfaları işle
             if not article_ranges:
                 article_ranges = [[i + 1 for i in range(total_pages)]]
+                self.logger.info("Tüm sayfalar işlenecek.")
 
-            # 1. Önce makale aralıklarını doğrula
             validated_ranges = []
             for page_range in article_ranges:
                 if all(1 <= p <= total_pages for p in page_range):
@@ -93,31 +99,31 @@ class PDFProcessor:
                         f"Geçersiz sayfa aralığı atlandı: {page_range}")
             article_ranges = validated_ranges
 
-            # 2. Eğer birleştirme indeksleri varsa, makaleleri birleştir
             if merge_article_indices:
                 article_ranges = self._merge_articles(
                     article_ranges, merge_article_indices)
+                self.logger.info("Makaleler birleştirildi.")
 
-            # 3. Her makale aralığı için ayrı işlem yap
             for i, page_range in enumerate(article_ranges, 1):
                 writer = PdfWriter()
 
-                # Sayfaları ekle (silinecek sayfaları atla)
                 for page_num in page_range:
                     if not pages_to_remove or page_num not in pages_to_remove:
                         writer.add_page(reader.pages[page_num - 1])
 
-                # Her makale için ayrı dosya oluştur
                 range_str = f"{min(page_range)}-{max(page_range)}"
                 file_base_name = self.generate_filename(
                     year, number, range_str)
 
-                # Çıktıları ana listeye ekle
                 article_outputs = self._save_outputs(
                     writer, file_base_name, base_path)
                 for key in outputs:
                     outputs[key].extend(article_outputs[key])
 
+                self.logger.info(
+                    f"Makale {i} işlendi: {file_base_name}")
+
+            self.logger.info("PDF işleme tamamlandı.")
             return outputs
 
         except Exception as e:
@@ -166,23 +172,36 @@ class PDFProcessor:
             images = convert_from_path(pdf_path)
             if images:
                 first_image = images[0]
+
+                # Small image (500x700)
                 small_path = base_path / 'small' / f"{file_base_name}.jpg"
-                first_image.thumbnail((800, 800))
-                first_image.save(str(small_path), 'JPEG')
+                small_image = first_image.copy()
+                small_image.thumbnail((500, 700))
+                small_image.save(str(small_path), 'JPEG')
                 outputs['small'].append(str(small_path))
 
+                # Large image (1024x1280)
                 large_path = base_path / 'large' / f"{file_base_name}.jpg"
-                first_image.save(str(large_path), 'JPEG')
+                large_image = first_image.copy()
+                large_image.thumbnail((1024, 1280))
+                large_image.save(str(large_path), 'JPEG')
                 outputs['large'].append(str(large_path))
 
-                try:
-                    ocr_text = pytesseract.image_to_string(
-                        first_image, lang='nld')
-                except pytesseract.TesseractError:
-                    self.logger.warning(
-                        "Hollandaca dil paketi bulunamadı. İngilizce kullanılıyor.")
-                    ocr_text = pytesseract.image_to_string(
-                        first_image, lang='eng')
+                # OCR işlemi (tüm sayfalar için)
+                ocr_text = ""
+                for image in images:
+                    try:
+                        ocr_text += pytesseract.image_to_string(
+                            image, lang='nld') + "\n"
+                    except pytesseract.TesseractError:
+                        self.logger.warning(
+                            "Hollandaca dil paketi bulunamadı. İngilizce kullanılıyor.")
+                        ocr_text += pytesseract.image_to_string(
+                            image, lang='eng') + "\n"
+
+                # OCR metnini cümlelere ayır
+                ocr_text = self._format_ocr_text(ocr_text)
+
                 ocr_path = base_path / 'ocr' / f"{file_base_name}.txt"
                 with open(ocr_path, 'w', encoding='utf-8') as ocr_file:
                     ocr_file.write(ocr_text)
@@ -192,3 +211,17 @@ class PDFProcessor:
                 f"Dosya işleme hatası {file_base_name}: {str(e)}")
             raise
         return outputs
+
+    def _format_ocr_text(self, text: str) -> str:
+        """OCR metnini cümlelere ayır ve formatla"""
+        import re
+        # Cümleleri ayır (nokta, ünlem, soru işareti ile bitenler)
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        formatted_text = []
+        for sentence in sentences:
+            # "n.v.t." gibi kısaltmaları kontrol et
+            if re.match(r'^[A-Za-z]+\.$', sentence):  # Kısaltmaları kontrol et
+                formatted_text.append(sentence)
+            else:
+                formatted_text.append(sentence + '\n')  # Yeni satıra geç
+        return ' '.join(formatted_text)
