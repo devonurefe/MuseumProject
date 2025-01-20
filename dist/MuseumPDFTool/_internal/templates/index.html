@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Verwerkingstool</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+    <div class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
+        <h1 class="text-2xl font-bold mb-6">PDF Verwerkingstool</h1>
+        <a class="text-red-500 text-xs font-bold my-4 block" href="{{ url_for('static', filename='PDF_Verwerking_Handleiding.pdf') }}" download>
+            Klik hier om de Handleiding te downloaden
+        </a>
+
+        <form id="uploadForm" class="space-y-4" enctype="multipart/form-data">
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="pdf_file">
+                    Selecteer PDF bestand:
+                </label>
+                <input type="file" 
+                       id="pdf_file" 
+                       name="pdf_file" 
+                       accept=".pdf"
+                       required 
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="year">
+                    Jaar:
+                </label>
+                <input type="text" 
+                       id="year" 
+                       name="year" 
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                       placeholder="bijv. 2012"
+                       required>
+            </div>
+
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="number">
+                    Nummer:
+                </label>
+                <input type="text" 
+                       id="number" 
+                       name="number" 
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                       placeholder="bijv. 2"
+                       required>
+            </div>
+
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="article_ranges">
+                    Paginabereiken (bijvoorbeeld: 1-3,4-6):
+                </label>
+                <input type="text" 
+                       id="article_ranges" 
+                       name="article_ranges" 
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                       placeholder="1-3,4-6">
+            </div>
+
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="merge_ranges">
+                    Pagina's samenvoegen (optioneel):
+                </label>
+                <input type="text" 
+                       id="merge_ranges" 
+                       name="merge_ranges" 
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                       placeholder="bijv. 1,3 (voor het samenvoegen van 1e en 3e artikel)">
+            </div>
+
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="remove_pages">
+                    Te verwijderen pagina's (komma gescheiden):
+                </label>
+                <input type="text" 
+                       id="remove_pages" 
+                       name="remove_pages" 
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                       placeholder="bijv. 1,2,3">
+            </div>
+
+            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline relative overflow-hidden">
+                <span class="relative z-10">Verwerken</span>
+                <div class="progress-bar absolute bottom-0 left-0 h-1 bg-blue-300" style="width: 0%;"></div>
+            </button>
+        </form>
+
+        <div id="result" class="mt-6 hidden">
+            <h2 class="text-lg font-semibold mb-2">Verwerkingsresultaten:</h2>
+            
+            <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                <div id="downloadLocation"></div>
+            </div>
+            
+            <div id="downloadLinks" class="space-y-2"></div>
+        </div>
+    </div>
+    <footer class="text-center mt-8">
+        <p class="text-gray-500 text-sm">Powered by <strong>h2O</strong></p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

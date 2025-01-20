@@ -6,7 +6,8 @@ added_files = [
     ('templates', 'templates'),
     ('static', 'static'),
     ('build/tesseract', 'tesseract'),
-    ('build/poppler', 'poppler')
+    ('build/poppler', 'poppler'),
+    ('app.ico', '.')  # app.ico dosyasını kök dizine ekleyin
 ]
 
 a = Analysis(
@@ -47,7 +48,8 @@ exe = EXE(
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
-    entitlements_file=None
+    entitlements_file=None,
+    icon='app.ico'  # Ikon dosyasının yolu
 )
 
 coll = COLLECT(

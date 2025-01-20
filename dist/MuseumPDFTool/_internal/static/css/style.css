@@ -1,0 +1,49 @@
+/* style.css */
+.progress-bar {
+    height: 4px;
+    background-color: #1975e5;
+    transition: width 0.3s ease-in-out;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+}
+
+button[type="submit"] {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+button[type="submit"].processing {
+    width: 600px;
+    background-color: #000000;
+}
+
+button[type="submit"]:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+footer {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    background-color: #f3f4f6;
+    text-align: center;
+    padding: 10px 0;
+    z-index: 1000;
+    border-top: 1px solid #e5e7eb;
+}
+
+/* Animasyon */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.processing {
+    animation: pulse 2s infinite;
+}

@@ -109,7 +109,7 @@ coll = COLLECT(
 )
 """
 
-    with open("museumapp.spec", "w") as f:
+    with open("museumapp.spec", "w", encoding='utf-8') as f:
         f.write(spec_content)
 
     # PyInstaller run
@@ -140,7 +140,7 @@ if __name__ == '__main__':
     app.run(debug=False)
 """
 
-    with open("launcher.py", "w") as f:
+    with open("launcher.py", "w", encoding='utf-8') as f:
         f.write(launcher_content)
 
 
@@ -162,7 +162,7 @@ def main():
         print("Zip-bestand gemaakt: MuseumPDFTool.zip")
 
     except Exception as e:
-        print(f": {str(e)}")
+        print(f"Hata: {str(e)}")
         sys.exit(1)
 
 
