@@ -4,7 +4,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const resultDiv = document.getElementById('result');
     const downloadLocation = document.getElementById('downloadLocation');
     const downloadLinks = document.getElementById('downloadLinks');
-    
+    const pdfPageCount = document.getElementById('pdfPageCount');
+    const notificationSound = document.getElementById('notificationSound');
+
     // Form reset fonksiyonu
     function resetForm() {
         form.reset();
@@ -13,14 +15,41 @@ document.addEventListener('DOMContentLoaded', function() {
         downloadLinks.innerHTML = '';
         submitButton.disabled = false;
         submitButton.querySelector('span').textContent = 'Verwerken';
+        pdfPageCount.textContent = ''; // Sayfa sayısını sıfırla
         const progressBar = submitButton.querySelector('.progress-bar');
         if (progressBar) {
             progressBar.style.width = '0%';
         }
     }
 
+    // PDF dosyasının sayfa sayısını göster
+    const fileInput = form.querySelector('input[type="file"]');
+    fileInput.addEventListener('change', function() {
+        const file = fileInput.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const pdfData = new Uint8Array(e.target.result);
+                const loadingTask = pdfjsLib.getDocument(pdfData);
+                loadingTask.promise.then(function(pdf) {
+                    pdfPageCount.textContent = `Aantal pagina's: ${pdf.numPages}`;
+                }).catch(function(error) {
+                    pdfPageCount.textContent = 'Fout bij het lezen van PDF';
+                });
+            };
+            reader.readAsArrayBuffer(file);
+        } else {
+            pdfPageCount.textContent = ''; // Dosya yüklenmezse sayfa sayısını sıfırla
+        }
+    });
+
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
+
+        // Önceki sonuçları sıfırla
+        resultDiv.classList.add('hidden');
+        downloadLocation.innerHTML = '';
+        downloadLinks.innerHTML = '';
 
         const progressBar = submitButton.querySelector('.progress-bar');
         progressBar.style.width = '0%';
@@ -46,7 +75,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const result = await response.json();
             
-            // progress bar'ı 100% 
+            // Progress bar'ı 100%
             clearInterval(progressInterval);
             progressBar.style.width = '100%';
 
@@ -55,14 +84,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     <p class="text-green-500">${result.message}</p>
                 `;
 
+                // Ses çalma
+                notificationSound.play();
+
                 downloadLinks.innerHTML = `
                     <div class="text-center p-4">
                         <a href="data:application/zip;base64,${result.zip_file.data}" 
                            download="${result.zip_file.name}"
                            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded inline-flex items-center">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                            </svg>
                             Download Output (${result.zip_file.name})
                         </a>
                     </div>
@@ -82,10 +111,6 @@ document.addEventListener('DOMContentLoaded', function() {
             submitButton.classList.remove('processing');
             submitButton.disabled = false;
             submitButton.querySelector('span').textContent = 'Verwerken';
-            
-            // Yeni bir dosya seçildiğinde formu resetle
-            const fileInput = form.querySelector('input[type="file"]');
-            fileInput.addEventListener('change', resetForm);
         }
     });
 });

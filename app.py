@@ -1,21 +1,23 @@
 from flask import Flask, render_template, request, jsonify, send_from_directory
 import os
-from werkzeug.utils import secure_filename
-from pdf_processor import PDFProcessor
+import threading
+import re
 import tempfile
 import base64
 import zipfile
 import io
 import webbrowser
-import threading
-import re
+from werkzeug.utils import secure_filename
+from pdf_processor import PDFProcessor
 
-# Geef template_map op met absoluut pad
-template_dir = os.path.abspath(os.path.join(
-    os.path.dirname(__file__), 'templates'))
-static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'static'))
-
-app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
+# Stel de template- en statische mappen in
+app = Flask(
+    __name__,
+    template_folder=os.path.abspath(os.path.join(
+        os.path.dirname(__file__), 'templates')),
+    static_folder=os.path.abspath(os.path.join(
+        os.path.dirname(__file__), 'static'))
+)
 
 # Max content length
 app.config['MAX_CONTENT_LENGTH'] = 40 * 1024 * 1024  # 40MB max-limit
@@ -23,7 +25,7 @@ app.config['MAX_CONTENT_LENGTH'] = 40 * 1024 * 1024  # 40MB max-limit
 ALLOWED_EXTENSIONS = {'pdf'}
 
 # PDF voorbeeld
-pdf_processor = PDFProcessor()
+pdf_processor = PDFProcessor(max_workers=os.cpu_count() or 1)
 
 
 def allowed_file(filename):
@@ -154,7 +156,7 @@ def upload_file():
                     file.save(temp_file.name)
                     filepath = temp_file.name
 
-                    # PDF-lezer maken en paginatelling krijgen
+                    # PDF-lezer maken ve sayfa sayısını almak
                     reader = pdf_processor.get_pdf_reader(filepath)
                     total_pages = len(reader.pages)
 
@@ -169,7 +171,7 @@ def upload_file():
                     except ValueError as e:
                         return jsonify({'error': str(e)}), 400
 
-                    # PProces PDF
+                    # PDF İşleme
                     output_files = pdf_processor.process_pdf(
                         input_pdf=filepath,
                         pages_to_remove=remove_pages,
@@ -179,7 +181,7 @@ def upload_file():
                         number=number
                     )
 
-                    # ZIP files
+                    # ZIP dosyaları
                     memory_file = io.BytesIO()
                     with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
                         for file_type, file_list in output_files.items():
@@ -197,7 +199,8 @@ def upload_file():
                         'zip_file': {
                             'name': f'output{year}{number}.zip',
                             'data': zip_data
-                        }
+                        },
+                        'sound': 'notification.mp3'  # Ses dosyası ismi
                     })
 
             except Exception as e:
@@ -241,14 +244,16 @@ def download_file(filename):
         return jsonify({'error': str(e)}), 404
 
 
+def allowed_file(filename):
+    return filename and '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
 def open_browser():
-    webbrowser.open("http://127.0.0.1:10000")
+    """Open de standaardbrowser naar de webapp."""
+    webbrowser.open('http://127.0.0.1:10010')
 
 
 if __name__ == '__main__':
-    # De browser automatisch openen
     threading.Timer(1, open_browser).start()
-
-    # De Flask-toepassing uitvoeren
-    port = int(os.environ.get('PORT', 10000))
+    port = int(os.environ.get('PORT', 10010))
     app.run(host='0.0.0.0', port=port)

@@ -1,28 +1,23 @@
 /* style.css */
-.progress-bar {
-    height: 4px;
-    background-color: #1975e5;
-    transition: width 0.3s ease-in-out;
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 0;
+button[type="submit"] {
+    width: 100%; /* Tam genişlik */
+    background-color: #4a90e2; /* Modern mavi renk */
+    transition: background-color 0.3s ease, transform 0.3s ease; /* Geçiş efektleri */
 }
 
-button[type="submit"] {
-    position: relative;
-    overflow: hidden;
-    transition: all 0.3s ease;
+button[type="submit"]:hover {
+    background-color: #357ab8; /* Hover rengi */
+    transform: scale(1.02); /* Hover'da büyütme efekti */
 }
 
 button[type="submit"].processing {
-    width: 600px;
-    background-color: #000000;
+    background-color: #000000; /* İşlem sırasında arka plan rengi */
 }
 
-button[type="submit"]:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
+.progress-bar {
+    height: 6px; /* Çubuğun yüksekliği */
+    background-color: #38a169; /* Modern yeşil renk */
+    transition: width 0.3s ease-in-out; /* Geçiş efekti */
 }
 
 footer {
@@ -46,4 +41,10 @@ footer {
 
 .processing {
     animation: pulse 2s infinite;
+}
+
+@media (max-width: 640px) { /* Mobil uyumlu stil */
+    button[type="submit"] {
+        padding: 12px; /* Mobilde buton içi boşluğu artır */
+    }
 }

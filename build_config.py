@@ -52,7 +52,7 @@ added_files = [
     ('static', 'static'),
     ('build/tesseract', 'tesseract'),
     ('build/poppler', 'poppler'),
-    ('app.ico', '.')  # app.ico dosyasını kök dizine ekleyin
+    ('app.ico', '.')  # app.ico
 ]
 
 a = Analysis(
@@ -94,7 +94,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='app.ico'  # Ikon dosyasının yolu
+    icon='app.ico'  # Ikon dosyas
 )
 
 coll = COLLECT(

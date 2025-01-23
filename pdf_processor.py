@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 import os
 import logging
 from datetime import datetime
@@ -5,21 +6,23 @@ from PyPDF2 import PdfReader, PdfWriter
 from pdf2image import convert_from_path
 import pytesseract
 import tempfile
-from typing import List, Dict, Tuple
+from typing import List, Dict
 from pathlib import Path
+from PIL import Image
+import re
 
 
 class PDFProcessor:
-    def __init__(self):
+    def __init__(self, max_workers=None):
         self.setup_tesseract()
         self.logger = None
+        self.max_workers = max_workers or (os.cpu_count() or 1)
 
     @staticmethod
     def setup_tesseract():
-        """Tesseract yapılandırması"""
+        """Tesseract configuratie"""
         import platform
 
-        # Ortam değişkeninden yolu al, yoksa varsayılanı kullan
         tesseract_path = os.getenv('TESSERACT_PATH')
 
         if not tesseract_path:
@@ -32,10 +35,10 @@ class PDFProcessor:
 
         if not os.path.isfile(pytesseract.pytesseract.tesseract_cmd):
             raise FileNotFoundError(
-                f"Tesseract bulunamadı: {tesseract_path}. Lütfen yükleyin.")
+                f"Tesseract niet gevonden: {tesseract_path}. Installeer alstublieft.")
 
     def create_output_folders(self) -> Path:
-        """Geçici klasör oluştur"""
+        """Maak tijdelijke mappen aan"""
         temp_dir = tempfile.mkdtemp()
         base_path = Path(temp_dir)
 
@@ -45,23 +48,21 @@ class PDFProcessor:
         return base_path
 
     def setup_logging(self, base_path: Path) -> logging.Logger:
-        """Logging ayarlarını yapar ve Hollandaca log mesajları ekler"""
+        """Instellen van logging en toevoegen van Nederlandse logberichten"""
         log_file = base_path / 'log' / f"{datetime.now():%Y%m%d_%H%M%S}.log"
         logging.basicConfig(filename=log_file, level=logging.INFO,
                             format='%(asctime)s - %(levelname)s - %(message)s')
         logger = logging.getLogger()
 
-        # Hollandaca log mesajları
-        logger.info("PDF işleme başladı.")
-        logger.info(f"Geçici klasör oluşturuldu: {base_path}")
-        logger.info("PDF, OCR, small, large ve log klasörleri oluşturuldu.")
+        logger.info("PDF-verwerking gestart.")
+        logger.info(f"Tijdelijke map aangemaakt: {base_path}")
+        logger.info("PDF-, OCR-, small-, large- en logmappen aangemaakt.")
 
         return logger
 
     @staticmethod
     def generate_filename(year: str, number: str, range_str: str) -> str:
         """Standart dosya adı oluştur"""
-        # range_str içindeki '-' işaretini kaldırıp birleştir
         start, end = range_str.split('-')
         return f"{year}{number.zfill(2)}{start.zfill(2)}{end.zfill(2)}"
 
@@ -76,152 +77,161 @@ class PDFProcessor:
             base_path = self.create_output_folders()
             self.logger = self.setup_logging(base_path)
             self.logger.info(
-                f"PDF işleme başladı: {os.path.basename(input_pdf)}")
+                f"PDF-verwerking gestart: {os.path.basename(input_pdf)}")
 
             reader = self.get_pdf_reader(input_pdf)
             total_pages = len(reader.pages)
 
             if total_pages == 0:
-                raise ValueError("PDF dosyası boş veya okunamıyor")
+                raise ValueError("PDF-bestand is leeg of niet leesbaar")
 
             outputs = {'pdf': [], 'small': [], 'large': [], 'ocr': []}
 
+            # Varsayılan olarak tüm sayfaları işle
             if not article_ranges:
                 article_ranges = [[i + 1 for i in range(total_pages)]]
-                self.logger.info("Tüm sayfalar işlenecek.")
 
-            validated_ranges = []
-            for page_range in article_ranges:
-                if all(1 <= p <= total_pages for p in page_range):
-                    validated_ranges.append(page_range)
-                else:
-                    self.logger.warning(
-                        f"Geçersiz sayfa aralığı atlandı: {page_range}")
-            article_ranges = validated_ranges
-
+            # Makale aralıklarını birleştirme
             if merge_article_indices:
                 article_ranges = self._merge_articles(
                     article_ranges, merge_article_indices)
-                self.logger.info("Makaleler birleştirildi.")
 
-            for i, page_range in enumerate(article_ranges, 1):
-                writer = PdfWriter()
+            # Thread havuzu ile işleme
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                futures = []
+                for page_range in article_ranges:
+                    futures.append(executor.submit(
+                        self._process_single_range,
+                        reader,
+                        page_range,
+                        pages_to_remove,
+                        base_path,
+                        year,
+                        number
+                    ))
 
-                for page_num in page_range:
-                    if not pages_to_remove or page_num not in pages_to_remove:
-                        writer.add_page(reader.pages[page_num - 1])
+                for future in futures:
+                    try:
+                        result = future.result()
+                        for key, value in result.items():
+                            outputs[key].extend(value)
+                    except Exception as e:
+                        self.logger.error(f"Verwerkingsfout: {e}")
 
-                range_str = f"{min(page_range)}-{max(page_range)}"
-                file_base_name = self.generate_filename(
-                    year, number, range_str)
-
-                article_outputs = self._save_outputs(
-                    writer, file_base_name, base_path)
-                for key in outputs:
-                    outputs[key].extend(article_outputs[key])
-
-                self.logger.info(
-                    f"Makale {i} işlendi: {file_base_name}")
-
-            self.logger.info("PDF işleme tamamlandı.")
+            self.logger.info("PDF-verwerking voltooid.")
             return outputs
 
         except Exception as e:
-            self.logger.error(f"PDF işleme hatası: {str(e)}")
+            if self.logger:
+                self.logger.error(f"Fout tijdens PDF-verwerking: {str(e)}")
             raise
 
-    def _merge_articles(self, article_ranges: List[List[int]], merge_indices: List[int]) -> List[List[int]]:
-        if not merge_indices or len(merge_indices) < 2:
-            return article_ranges
+    def _process_single_range(self, reader, page_range, pages_to_remove, base_path, year, number):
+        writer = PdfWriter()
+        for page_num in page_range:
+            if not pages_to_remove or page_num not in pages_to_remove:
+                writer.add_page(reader.pages[page_num - 1])
 
-        # Geçerli indeksleri kontrol et (1-tabanlı indeksler)
-        valid_indices = sorted(
-            [i for i in merge_indices if 1 <= i <= len(article_ranges)])
-        if len(valid_indices) < 2:
-            return article_ranges
+        range_str = f"{min(page_range)}-{max(page_range)}"
+        file_base_name = self.generate_filename(year, number, range_str)
 
-        # Birleştirilecek makaleleri al
-        all_pages = []
-        merged_indices = set()  # Birleştirilen indeksleri takip et
-        for i in valid_indices:
-            all_pages.extend(article_ranges[i-1])
-            merged_indices.add(i-1)
-
-        # Yeni birleştirilmiş aralık
-        merged_range = sorted(all_pages)
-
-        # Sonuç listesini oluştur
-        result = []
-        for i in range(len(article_ranges)):
-            if i == valid_indices[0] - 1:  # İlk birleştirme indeksine geldiğimizde
-                result.append(merged_range)
-            elif i not in merged_indices:  # Birleştirilmeyen makaleleri ekle
-                result.append(article_ranges[i])
-
-        return result
+        return self._save_outputs(writer, file_base_name, base_path)
 
     def _save_outputs(self, writer: PdfWriter, file_base_name: str, base_path: Path) -> Dict[str, List[str]]:
-        """PDF, görüntü ve OCR çıktılarını kaydet"""
         outputs = {'pdf': [], 'small': [], 'large': [], 'ocr': []}
         try:
+            # PDF kaydetme
             pdf_path = base_path / 'pdf' / f"{file_base_name}.pdf"
             with open(pdf_path, 'wb') as pdf_file:
                 writer.write(pdf_file)
             outputs['pdf'].append(str(pdf_path))
 
-            images = convert_from_path(pdf_path)
+            # İlk sayfayı görüntü olarak kaydet
+            images = convert_from_path(pdf_path, first_page=1, last_page=1)
             if images:
                 first_image = images[0]
 
-                # Small image (500x700)
+                # Optimize görüntü boyutlandırma
                 small_path = base_path / 'small' / f"{file_base_name}.jpg"
-                small_image = first_image.copy()
-                small_image.thumbnail((500, 700))
-                small_image.save(str(small_path), 'JPEG')
-                outputs['small'].append(str(small_path))
-
-                # Large image (1024x1280)
                 large_path = base_path / 'large' / f"{file_base_name}.jpg"
-                large_image = first_image.copy()
-                large_image.thumbnail((1024, 1280))
-                large_image.save(str(large_path), 'JPEG')
+
+                # Görüntü boyutlandırma
+                self._save_optimized_image(first_image, small_path, (500, 700))
+                self._save_optimized_image(
+                    first_image, large_path, (1024, 1280))
+
+                outputs['small'].append(str(small_path))
                 outputs['large'].append(str(large_path))
 
-                # OCR işlemi (tüm sayfalar için)
-                ocr_text = ""
-                for image in images:
-                    try:
-                        ocr_text += pytesseract.image_to_string(
-                            image, lang='nld') + "\n"
-                    except pytesseract.TesseractError:
-                        self.logger.warning(
-                            "Hollandaca dil paketi bulunamadı. İngilizce kullanılıyor.")
-                        ocr_text += pytesseract.image_to_string(
-                            image, lang='eng') + "\n"
+            # OCR işlemi
+            # Tüm sayfaları almak için yeniden çağırıyoruz
+            images = convert_from_path(pdf_path)
+            ocr_text = self._perform_ocr(images)
+            ocr_path = base_path / 'ocr' / f"{file_base_name}.txt"
+            with open(ocr_path, 'w', encoding='utf-8') as ocr_file:
+                ocr_file.write(ocr_text)
+            outputs['ocr'].append(str(ocr_path))
 
-                # OCR metnini cümlelere ayır
-                ocr_text = self._format_ocr_text(ocr_text)
-
-                ocr_path = base_path / 'ocr' / f"{file_base_name}.txt"
-                with open(ocr_path, 'w', encoding='utf-8') as ocr_file:
-                    ocr_file.write(ocr_text)
-                outputs['ocr'].append(str(ocr_path))
         except Exception as e:
             self.logger.error(
-                f"Dosya işleme hatası {file_base_name}: {str(e)}")
+                f"Fout bij bestandsverwerking {file_base_name}: {str(e)}")
             raise
+
         return outputs
 
+    def _save_optimized_image(self, image, path, max_size):
+        # Optimize görüntü boyutlandırma
+        img = image.copy()
+        img.thumbnail(max_size, Image.LANCZOS)
+        img.save(path, optimize=True, quality=85)
+
+    def _perform_ocr(self, images):
+        # Optimize OCR
+        ocr_text = ""
+        for image in images:
+            try:
+                ocr_text += pytesseract.image_to_string(
+                    image, lang='nld') + "\n"
+            except pytesseract.TesseractError:
+                ocr_text += pytesseract.image_to_string(
+                    image, lang='eng') + "\n"
+
+        return self._format_ocr_text(ocr_text)
+
+    def _merge_articles(self, article_ranges: List[List[int]], merge_indices: List[int]) -> List[List[int]]:
+        # Mevcut merge_articles metodunu koruyoruz
+        if not merge_indices or len(merge_indices) < 2:
+            return article_ranges
+
+        valid_indices = sorted(
+            [i for i in merge_indices if 1 <= i <= len(article_ranges)])
+        if len(valid_indices) < 2:
+            return article_ranges
+
+        all_pages = []
+        merged_indices = set()
+        for i in valid_indices:
+            all_pages.extend(article_ranges[i-1])
+            merged_indices.add(i-1)
+
+        merged_range = sorted(all_pages)
+
+        result = []
+        for i in range(len(article_ranges)):
+            if i == valid_indices[0] - 1:
+                result.append(merged_range)
+            elif i not in merged_indices:
+                result.append(article_ranges[i])
+
+        return result
+
     def _format_ocr_text(self, text: str) -> str:
-        """OCR metnini cümlelere ayır ve formatla"""
-        import re
-        # Cümleleri ayır (nokta, ünlem, soru işareti ile bitenler)
+        # OCR metin formatını koruyoruz
         sentences = re.split(r'(?<=[.!?])\s+', text)
         formatted_text = []
         for sentence in sentences:
-            # "n.v.t." gibi kısaltmaları kontrol et
-            if re.match(r'^[A-Za-z]+\.$', sentence):  # Kısaltmaları kontrol et
+            if re.match(r'^[A-Za-z]+\.$', sentence):
                 formatted_text.append(sentence)
             else:
-                formatted_text.append(sentence + '\n')  # Yeni satıra geç
+                formatted_text.append(sentence + '\n')
         return ' '.join(formatted_text)
