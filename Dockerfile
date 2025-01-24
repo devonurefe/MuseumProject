@@ -18,11 +18,9 @@ EXPOSE $PORT
 
 # Memory limit ve timeout ayarları eklendi
 CMD gunicorn --bind 0.0.0.0:$PORT \
-    --workers 1 \
+    --workers 2 \
     --timeout 760 \
-    --max-requests 1000 \
-    --max-requests-jitter 50 \
-    --log-level debug \
+    --max-requests 500 \
     --worker-class gthread \
-    --threads 4 \
+    --threads 2 \
     app:app

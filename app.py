@@ -137,7 +137,7 @@ def upload_file():
         if file.filename == '':
             return jsonify({'error': 'Er is geen bestand geselecteerd'}), 400
 
-        # Jaar- en nummercontrole
+        # Year and number validation
         year = request.form.get('year', '')
         number = request.form.get('number', '')
 
@@ -151,17 +151,17 @@ def upload_file():
 
         if file and allowed_file(file.filename):
             try:
-                # Tijdelijk bestand maken
+                # Temporary file creation
                 with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
                     file.save(temp_file.name)
                     filepath = temp_file.name
 
-                    # PDF-lezer maken ve sayfa sayısını almak
+                    # PDF reader and page count
                     reader = pdf_processor.get_pdf_reader(filepath)
                     total_pages = len(reader.pages)
 
                     try:
-                        # Formuliergegevens verwerken
+                        # Process form data
                         article_ranges = process_ranges(
                             request.form.get('article_ranges', ''), total_pages)
                         remove_pages = process_remove_pages(
@@ -171,7 +171,7 @@ def upload_file():
                     except ValueError as e:
                         return jsonify({'error': str(e)}), 400
 
-                    # PDF İşleme
+                    # PDF Processing
                     output_files = pdf_processor.process_pdf(
                         input_pdf=filepath,
                         pages_to_remove=remove_pages,
@@ -181,7 +181,7 @@ def upload_file():
                         number=number
                     )
 
-                    # ZIP dosyaları
+                    # ZIP files
                     memory_file = io.BytesIO()
                     with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
                         for file_type, file_list in output_files.items():
@@ -200,14 +200,14 @@ def upload_file():
                             'name': f'output{year}{number}.zip',
                             'data': zip_data
                         },
-                        'sound': 'notification.mp3'  # Ses dosyası ismi
+                        'sound': 'notification.mp3'
                     })
 
             except Exception as e:
-                return jsonify({'error': 'Er is een fout opgetreden tijdens de verwerking. Controleer uw invoer en probeer het opnieuw.'}), 500
+                return jsonify({'error': f'Verwerkingsfout: {str(e)}'}), 500
 
             finally:
-                # Temizlik
+                # Cleanup
                 if 'filepath' in locals():
                     try:
                         os.remove(filepath)
@@ -224,24 +224,23 @@ def upload_file():
         return jsonify({'error': 'Niet-toegestaan bestandstype'}), 400
 
     except Exception as e:
-        return jsonify({'error': 'Er is een onverwachte fout opgetreden. Probeer het later opnieuw.'}), 500
+        return jsonify({'error': f'Onverwachte fout: {str(e)}'}), 500
 
+# @app.route('/download/<path:filename>')
+# def download_file(filename):
+#     try:
+#         downloads_folder = os.path.join(
+#             os.path.expanduser('~'), 'Downloads', 'museumproject')
+#         directory = os.path.dirname(os.path.join(downloads_folder, filename))
+#         filename = os.path.basename(filename)
 
-@app.route('/download/<path:filename>')
-def download_file(filename):
-    try:
-        downloads_folder = os.path.join(
-            os.path.expanduser('~'), 'Downloads', 'museumproject')
-        directory = os.path.dirname(os.path.join(downloads_folder, filename))
-        filename = os.path.basename(filename)
-
-        return send_from_directory(
-            directory,
-            filename,
-            as_attachment=True
-        )
-    except Exception as e:
-        return jsonify({'error': str(e)}), 404
+#         return send_from_directory(
+#             directory,
+#             filename,
+#             as_attachment=True
+#         )
+#     except Exception as e:
+#         return jsonify({'error': str(e)}), 404
 
 
 def allowed_file(filename):
