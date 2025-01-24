@@ -1,3 +1,4 @@
+# pdf_process.py (güncellenmiş ve uyumlu hale getirilmiş hali)
 from concurrent.futures import ThreadPoolExecutor
 import os
 import logging
@@ -20,7 +21,7 @@ class PDFProcessor:
 
     @staticmethod
     def setup_tesseract():
-        """Tesseract configuratie"""
+        """Tesseract konfigurasyonu"""
         import platform
 
         tesseract_path = os.getenv('TESSERACT_PATH')
@@ -35,10 +36,10 @@ class PDFProcessor:
 
         if not os.path.isfile(pytesseract.pytesseract.tesseract_cmd):
             raise FileNotFoundError(
-                f"Tesseract niet gevonden: {tesseract_path}. Installeer alstublieft.")
+                f"Tesseract bulunamadı: {tesseract_path}. Lütfen kurulum yapın.")
 
     def create_output_folders(self) -> Path:
-        """Maak tijdelijke mappen aan"""
+        """Geçici çıktı klasörleri oluştur"""
         temp_dir = tempfile.mkdtemp()
         base_path = Path(temp_dir)
 
@@ -48,26 +49,25 @@ class PDFProcessor:
         return base_path
 
     def setup_logging(self, base_path: Path) -> logging.Logger:
-        """Instellen van logging en toevoegen van Nederlandse logberichten"""
+        """Logging ayarları"""
         log_file = base_path / 'log' / f"{datetime.now():%Y%m%d_%H%M%S}.log"
         logging.basicConfig(filename=log_file, level=logging.INFO,
                             format='%(asctime)s - %(levelname)s - %(message)s')
         logger = logging.getLogger()
 
-        logger.info("PDF-verwerking gestart.")
-        logger.info(f"Tijdelijke map aangemaakt: {base_path}")
-        logger.info("PDF-, OCR-, small-, large- en logmappen aangemaakt.")
+        logger.info("PDF işleme başlatıldı.")
+        logger.info(f"Geçici klasör oluşturuldu: {base_path}")
 
         return logger
 
     @staticmethod
     def generate_filename(year: str, number: str, range_str: str) -> str:
-        """Standart dosya adı oluştur"""
+        """Dosya adı oluştur"""
         start, end = range_str.split('-')
         return f"{year}{number.zfill(2)}{start.zfill(2)}{end.zfill(2)}"
 
     def get_pdf_reader(self, input_pdf: str) -> PdfReader:
-        """PDF dosyasını oku ve PdfReader döndür"""
+        """PDF dosyasını okuyarak PdfReader döndür"""
         return PdfReader(input_pdf)
 
     def process_pdf(self, input_pdf: str, pages_to_remove: List[int] = None,
@@ -77,26 +77,23 @@ class PDFProcessor:
             base_path = self.create_output_folders()
             self.logger = self.setup_logging(base_path)
             self.logger.info(
-                f"PDF-verwerking gestart: {os.path.basename(input_pdf)}")
+                f"PDF işleme başlatıldı: {os.path.basename(input_pdf)}")
 
             reader = self.get_pdf_reader(input_pdf)
             total_pages = len(reader.pages)
 
             if total_pages == 0:
-                raise ValueError("PDF-bestand is leeg of niet leesbaar")
+                raise ValueError("PDF dosyası boş ya da okunamıyor")
 
             outputs = {'pdf': [], 'small': [], 'large': [], 'ocr': []}
 
-            # Varsayılan olarak tüm sayfaları işle
             if not article_ranges:
                 article_ranges = [[i + 1 for i in range(total_pages)]]
 
-            # Makale aralıklarını birleştirme
             if merge_article_indices:
                 article_ranges = self._merge_articles(
                     article_ranges, merge_article_indices)
 
-            # Thread havuzu ile işleme
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 futures = []
                 for page_range in article_ranges:
@@ -116,14 +113,14 @@ class PDFProcessor:
                         for key, value in result.items():
                             outputs[key].extend(value)
                     except Exception as e:
-                        self.logger.error(f"Verwerkingsfout: {e}")
+                        self.logger.error(f"Hata: {e}")
 
-            self.logger.info("PDF-verwerking voltooid.")
+            self.logger.info("PDF işleme tamamlandı.")
             return outputs
 
         except Exception as e:
             if self.logger:
-                self.logger.error(f"Fout tijdens PDF-verwerking: {str(e)}")
+                self.logger.error(f"PDF işleme hatası: {str(e)}")
             raise
 
     def _process_single_range(self, reader, page_range, pages_to_remove, base_path, year, number):
@@ -140,22 +137,18 @@ class PDFProcessor:
     def _save_outputs(self, writer: PdfWriter, file_base_name: str, base_path: Path) -> Dict[str, List[str]]:
         outputs = {'pdf': [], 'small': [], 'large': [], 'ocr': []}
         try:
-            # PDF kaydetme
             pdf_path = base_path / 'pdf' / f"{file_base_name}.pdf"
             with open(pdf_path, 'wb') as pdf_file:
                 writer.write(pdf_file)
             outputs['pdf'].append(str(pdf_path))
 
-            # İlk sayfayı görüntü olarak kaydet
             images = convert_from_path(pdf_path, first_page=1, last_page=1)
             if images:
                 first_image = images[0]
 
-                # Optimize görüntü boyutlandırma
                 small_path = base_path / 'small' / f"{file_base_name}.jpg"
                 large_path = base_path / 'large' / f"{file_base_name}.jpg"
 
-                # Görüntü boyutlandırma
                 self._save_optimized_image(first_image, small_path, (500, 700))
                 self._save_optimized_image(
                     first_image, large_path, (1024, 1280))
@@ -163,8 +156,6 @@ class PDFProcessor:
                 outputs['small'].append(str(small_path))
                 outputs['large'].append(str(large_path))
 
-            # OCR işlemi
-            # Tüm sayfaları almak için yeniden çağırıyoruz
             images = convert_from_path(pdf_path)
             ocr_text = self._perform_ocr(images)
             ocr_path = base_path / 'ocr' / f"{file_base_name}.txt"
@@ -174,19 +165,17 @@ class PDFProcessor:
 
         except Exception as e:
             self.logger.error(
-                f"Fout bij bestandsverwerking {file_base_name}: {str(e)}")
+                f"Dosya işleme hatası {file_base_name}: {str(e)}")
             raise
 
         return outputs
 
     def _save_optimized_image(self, image, path, max_size):
-        # Optimize görüntü boyutlandırma
         img = image.copy()
         img.thumbnail(max_size, Image.LANCZOS)
         img.save(path, optimize=True, quality=85)
 
     def _perform_ocr(self, images):
-        # Optimize OCR
         ocr_text = ""
         for image in images:
             try:
@@ -199,7 +188,6 @@ class PDFProcessor:
         return self._format_ocr_text(ocr_text)
 
     def _merge_articles(self, article_ranges: List[List[int]], merge_indices: List[int]) -> List[List[int]]:
-        # Mevcut merge_articles metodunu koruyoruz
         if not merge_indices or len(merge_indices) < 2:
             return article_ranges
 
@@ -226,7 +214,6 @@ class PDFProcessor:
         return result
 
     def _format_ocr_text(self, text: str) -> str:
-        # OCR metin formatını koruyoruz
         sentences = re.split(r'(?<=[.!?])\s+', text)
         formatted_text = []
         for sentence in sentences:

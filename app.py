@@ -250,10 +250,14 @@ def allowed_file(filename):
 
 def open_browser():
     """Open de standaardbrowser naar de webapp."""
-    webbrowser.open('http://127.0.0.1:10010')
+    webbrowser.open(f'http://127.0.0.1:{port}')
 
 
 if __name__ == '__main__':
-    threading.Timer(1, open_browser).start()
     port = int(os.environ.get('PORT', 10010))
+
+    # Render için browser açma kodunu kaldır
+    if os.environ.get('RENDER') is None:
+        threading.Timer(1, open_browser).start()
+
     app.run(host='0.0.0.0', port=port)
