@@ -226,26 +226,6 @@ def upload_file():
     except Exception as e:
         return jsonify({'error': f'Onverwachte fout: {str(e)}'}), 500
 
-# @app.route('/download/<path:filename>')
-# def download_file(filename):
-#     try:
-#         downloads_folder = os.path.join(
-#             os.path.expanduser('~'), 'Downloads', 'museumproject')
-#         directory = os.path.dirname(os.path.join(downloads_folder, filename))
-#         filename = os.path.basename(filename)
-
-#         return send_from_directory(
-#             directory,
-#             filename,
-#             as_attachment=True
-#         )
-#     except Exception as e:
-#         return jsonify({'error': str(e)}), 404
-
-
-def allowed_file(filename):
-    return filename and '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
 
 def open_browser():
     """Open de standaardbrowser naar de webapp."""
@@ -254,8 +234,6 @@ def open_browser():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10010))
-
-    # Render için browser açma kodunu kaldır
     if os.environ.get('RENDER') is None:
         threading.Timer(1, open_browser).start()
 

@@ -32,7 +32,7 @@ footer {
     border-top: 1px solid #e5e7eb;
 }
 
-/* Animasyon */
+/* Animatie */
 @keyframes pulse {
     0% { transform: scale(1); }
     50% { transform: scale(1.05); }
