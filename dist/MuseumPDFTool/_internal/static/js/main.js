@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const pdfPageCount = document.getElementById('pdfPageCount');
     const notificationSound = document.getElementById('notificationSound');
 
-    // Form reset fonksiyonu
+    // Form reset functie
     function resetForm() {
         form.reset();
         resultDiv.classList.add('hidden');
@@ -15,14 +15,14 @@ document.addEventListener('DOMContentLoaded', function() {
         downloadLinks.innerHTML = '';
         submitButton.disabled = false;
         submitButton.querySelector('span').textContent = 'Verwerken';
-        pdfPageCount.textContent = ''; // Sayfa sayısını sıfırla
+        pdfPageCount.textContent = ''; // Reset pagina telling
         const progressBar = submitButton.querySelector('.progress-bar');
         if (progressBar) {
             progressBar.style.width = '0%';
         }
     }
 
-    // PDF dosyasının sayfa sayısını göster
+    // Toon het aantal pagina's van de PDF
     const fileInput = form.querySelector('input[type="file"]');
     fileInput.addEventListener('change', function() {
         const file = fileInput.files[0];
@@ -39,14 +39,14 @@ document.addEventListener('DOMContentLoaded', function() {
             };
             reader.readAsArrayBuffer(file);
         } else {
-            pdfPageCount.textContent = ''; // Dosya yüklenmezse sayfa sayısını sıfırla
+            pdfPageCount.textContent = ''; // Reset als er geen bestand is
         }
     });
 
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
 
-        // Önceki sonuçları sıfırla
+        // Reset vorige resultaten
         resultDiv.classList.add('hidden');
         downloadLocation.innerHTML = '';
         downloadLinks.innerHTML = '';
@@ -54,13 +54,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const progressBar = submitButton.querySelector('.progress-bar');
         progressBar.style.width = '0%';
         
-        // Animasyon başlangıcı
+        // Start animatie
         submitButton.classList.add('processing');
         submitButton.querySelector('span').textContent = 'Verwerking...';
         
         let progress = 0;
         const progressInterval = setInterval(() => {
-            progress = Math.min(progress + 5, 90); // Max 90% until complete
+            progress = Math.min(progress + 5, 90); // Max 90% tot voltooiing
             progressBar.style.width = `${progress}%`;
         }, 200);
 
@@ -75,7 +75,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const result = await response.json();
             
-            // Progress bar'ı 100%
+            // Progress bar naar 100%
             clearInterval(progressInterval);
             progressBar.style.width = '100%';
 
@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <p class="text-green-500">${result.message}</p>
                 `;
 
-                // Ses çalma
+                // Speel geluid af
                 notificationSound.play();
 
                 downloadLinks.innerHTML = `
@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
             resultDiv.classList.remove('hidden');
         } finally {
-            // Animasyonu kaldır ve butonu resetle
+            // Stop animatie en reset knop
             submitButton.classList.remove('processing');
             submitButton.disabled = false;
             submitButton.querySelector('span').textContent = 'Verwerken';

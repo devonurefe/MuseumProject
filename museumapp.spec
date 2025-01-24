@@ -19,7 +19,9 @@ a = Analysis(
         'PyPDF2',
         'pdf2image',
         'pytesseract',
-        'werkzeug.middleware.proxy_fix'
+        'werkzeug.middleware.proxy_fix',
+        'PIL',  # Pillow için
+        'flask',  # Flask için
     ],
     hookspath=[],
     hooksconfig={},
@@ -42,14 +44,14 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=True,  # UPX sıkıştırmasını etkinleştir
     console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='app.ico'  # Ikon dosyas
+    icon='app.ico'  # Ikon dosyası
 )
 
 coll = COLLECT(
@@ -58,7 +60,7 @@ coll = COLLECT(
     a.zipfiles,
     a.datas,
     strip=False,
-    upx=True,
+    upx=True,  # UPX sıkıştırmasını etkinleştir
     upx_exclude=[],
     name='MuseumPDFTool'
 )

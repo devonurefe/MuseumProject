@@ -2,15 +2,15 @@ import os
 import sys
 
 def setup_environment():
-    # De toepassingsmap bepalen
+    # Uygulama dizinini belirle
     base_path = getattr(sys, '_MEIPASS', os.path.abspath(os.path.dirname(__file__)))
     
-    # Pas het pad van de vlakvulling aan
+    # Tesseract yolunu ayarla
     tesseract_path = os.path.join(base_path, 'tesseract')
     os.environ['PATH'] = tesseract_path + os.pathsep + os.environ.get('PATH', '')
     os.environ['TESSDATA_PREFIX'] = os.path.join(tesseract_path, 'tessdata')
     
-    # 
+    # Poppler yolunu ayarla
     poppler_path = os.path.join(base_path, 'poppler')
     os.environ['PATH'] = poppler_path + os.pathsep + os.environ.get('PATH', '')
 
