@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const pdfPageCount = document.getElementById('pdfPageCount');
     const notificationSound = document.getElementById('notificationSound');
 
-    // Form reset functie
+    // Form reset function
     function resetForm() {
         form.reset();
         resultDiv.classList.add('hidden');
@@ -15,14 +15,14 @@ document.addEventListener('DOMContentLoaded', function() {
         downloadLinks.innerHTML = '';
         submitButton.disabled = false;
         submitButton.querySelector('span').textContent = 'Verwerken';
-        pdfPageCount.textContent = ''; // Reset pagina telling
+        pdfPageCount.textContent = ''; // Reset page count
         const progressBar = submitButton.querySelector('.progress-bar');
         if (progressBar) {
             progressBar.style.width = '0%';
         }
     }
 
-    // Toon het aantal pagina's van de PDF
+    // Show the number of pages in the PDF
     const fileInput = form.querySelector('input[type="file"]');
     fileInput.addEventListener('change', function() {
         const file = fileInput.files[0];
@@ -39,43 +39,43 @@ document.addEventListener('DOMContentLoaded', function() {
             };
             reader.readAsArrayBuffer(file);
         } else {
-            pdfPageCount.textContent = ''; // Reset als er geen bestand is
+            pdfPageCount.textContent = ''; // Reset if no file is selected
         }
     });
 
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
 
-        // Reset vorige resultaten
+        // Reset previous results
         resultDiv.classList.add('hidden');
         downloadLocation.innerHTML = '';
         downloadLinks.innerHTML = '';
 
         const progressBar = submitButton.querySelector('.progress-bar');
         progressBar.style.width = '0%';
-        
-        // Start animatie
+
+        // Start animation
         submitButton.classList.add('processing');
         submitButton.querySelector('span').textContent = 'Verwerking...';
-        
+
         let progress = 0;
         const progressInterval = setInterval(() => {
-            progress = Math.min(progress + 5, 90); // Max 90% tot voltooiing
+            progress = Math.min(progress + 5, 90); // Max 90% until completion
             progressBar.style.width = `${progress}%`;
         }, 200);
 
         try {
             submitButton.disabled = true;
             const formData = new FormData(form);
-            
+
             const response = await fetch('/upload', {
                 method: 'POST',
                 body: formData
             });
 
             const result = await response.json();
-            
-            // Progress bar naar 100%
+
+            // Progress bar to 100%
             clearInterval(progressInterval);
             progressBar.style.width = '100%';
 
@@ -84,12 +84,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     <p class="text-green-500">${result.message}</p>
                 `;
 
-                // Speel geluid af
+                // Play notification sound
                 notificationSound.play();
 
                 downloadLinks.innerHTML = `
                     <div class="text-center p-4">
-                        <a href="data:application/zip;base64,${result.zip_file.data}" 
+                        <a href="data:application/zip;base64,${result.zip_file.data}"
                            download="${result.zip_file.name}"
                            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded inline-flex items-center">
                             Download Output (${result.zip_file.name})
@@ -107,10 +107,23 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
             resultDiv.classList.remove('hidden');
         } finally {
-            // Stop animatie en reset knop
+            // Stop animation and reset button
             submitButton.classList.remove('processing');
             submitButton.disabled = false;
             submitButton.querySelector('span').textContent = 'Verwerken';
         }
     });
+
+    // Register the service worker
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/static/js/service-worker.js')
+                .then(function(registration) {
+                    console.log('Service Worker registered with scope:', registration.scope);
+                })
+                .catch(function(error) {
+                    console.log('Service Worker registration failed:', error);
+                });
+        });
+    }
 });
