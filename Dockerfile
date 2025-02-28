@@ -20,10 +20,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Expose a fixed port
-EXPOSE 10000
+EXPOSE 10010
 
 # Run the application using Gunicorn with configurable options
-CMD ["gunicorn", "--bind", "0.0.0.0:10000", \
+CMD ["gunicorn", "--bind", "0.0.0.0:10010", \
     "--workers", "2", \
     "--timeout", "760", \
     "--max-requests", "500", \
