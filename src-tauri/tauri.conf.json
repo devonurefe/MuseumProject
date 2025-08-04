@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.tauri.app/config/2.0.json",
+  "productName": "Museum PDF Tool",
+  "version": "1.0.0",
+  "identifier": "com.museum.pdf-tool",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Museum PDF Tool - Safe & Local",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
+        "maximizable": true,
+        "minimizable": true,
+        "closable": true,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [],
+    "externalBin": [],
+    "copyright": "© 2024 Museum Team",
+    "category": "Productivity",
+    "shortDescription": "Safe PDF processing tool for museums",
+    "longDescription": "A secure, local desktop application for processing PDF documents. Extract images, perform OCR, and manage museum documents safely on your computer.",
+    "deb": {
+      "depends": []
+    },
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "10.13",
+      "entitlements": null,
+      "exceptionDomain": "",
+      "signingIdentity": null,
+      "hardenedRuntime": true
+    },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "",
+      "wix": {
+        "language": "en-US"
+      }
+    }
+  },
+  "plugins": {
+    "fs": {
+      "scope": {
+        "allow": ["$DOCUMENT/*", "$DOWNLOAD/*", "$DESKTOP/*"],
+        "deny": []
+      }
+    },
+    "dialog": {
+      "open": true,
+      "save": true
+    }
+  }
+}
