@@ -1,0 +1,61 @@
+[package]
+name = "museum-pdf-tool"
+version = "1.0.0"
+description = "A secure, local PDF processing tool with OCR, image extraction, and article merging"
+authors = ["Museum Team"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0", features = ["macos-private-api"] }
+tauri-plugin-fs = "2.0"
+tauri-plugin-dialog = "2.0"
+tauri-plugin-shell = "2.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+
+# PDF Processing - Equivalent to PyPDF2
+lopdf = "0.32"
+pdf-extract = "0.7"
+pdf = "0.8"
+
+# Image processing - Equivalent to Pillow + pdf2image
+image = { version = "0.24", features = ["jpeg", "png", "gif", "bmp"] }
+imageproc = "0.23"
+pdf-render = "0.8"
+
+# OCR - Equivalent to pytesseract
+tesseract = "0.13"
+leptess = "0.13"
+
+# File operations
+base64 = "0.21"
+tempfile = "3.8"
+uuid = { version = "1.0", features = ["v4"] }
+walkdir = "2.4"
+zip = "0.6"
+
+# Date/time for filename generation
+chrono = { version = "0.4", features = ["serde"] }
+
+# Parallel processing - Equivalent to ThreadPoolExecutor
+rayon = "1.8"
+
+# Text processing
+regex = "1.10"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+log = "0.4"
+env_logger = "0.10"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-fs = "2.0"
+tauri-plugin-dialog = "2.0"
+tauri-plugin-shell = "2.0"

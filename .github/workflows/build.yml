@@ -1,0 +1,83 @@
+name: 'Build and Release Museum PDF Tool'
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest'
+            args: '--target universal-apple-darwin'
+          - platform: 'ubuntu-22.04'
+            args: '--target x86_64-unknown-linux-gnu'
+          - platform: 'windows-latest'
+            args: '--target x86_64-pc-windows-msvc'
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'universal-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Sync node version and setup cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Build the app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Museum PDF Tool v__VERSION__'
+          releaseBody: |
+            🏛️ **Museum PDF Tool - Güvenli Desktop Uygulaması**
+            
+            **✨ Yeni Özellikler:**
+            - Güvenli, yerel PDF işleme
+            - Virüs algılanmayan temiz kod
+            - Cross-platform destek (Windows, Mac, Linux)
+            - Modern kullanıcı arayüzü
+            
+            **🔧 Kurulum:**
+            - Windows: `.exe` dosyasını indirip çalıştırın
+            - Mac: `.dmg` dosyasını indirip uygulamayı Applications klasörüne sürükleyin
+            - Linux: `.deb` paketini kurun
+            
+            **🛡️ Güvenlik:**
+            - Tamamen yerel çalışır
+            - İnternet bağlantısı gerektirmez
+            - Verileriniz bilgisayarınızda kalır
+            
+            Yaşasın güvenli kodlama! 🎉
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
