@@ -1,0 +1,50 @@
+/* style.css */
+button[type="submit"] {
+    width: 100%; /* Tam genişlik */
+    background-color: #4a90e2; /* Modern mavi renk */
+    transition: background-color 0.3s ease, transform 0.3s ease; /* Geçiş efektleri */
+}
+
+button[type="submit"]:hover {
+    background-color: #357ab8; /* Hover rengi */
+    transform: scale(1.02); /* Hover'da büyütme efekti */
+}
+
+button[type="submit"].processing {
+    background-color: #000000; /* İşlem sırasında arka plan rengi */
+}
+
+.progress-bar {
+    height: 6px; /* Çubuğun yüksekliği */
+    background-color: #38a169; /* Modern yeşil renk */
+    transition: width 0.3s ease-in-out; /* Geçiş efekti */
+}
+
+footer {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    background-color: #f3f4f6;
+    text-align: center;
+    padding: 10px 0;
+    z-index: 1000;
+    border-top: 1px solid #e5e7eb;
+}
+
+/* Animatie */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.processing {
+    animation: pulse 2s infinite;
+}
+
+@media (max-width: 640px) { /* Mobil uyumlu stil */
+    button[type="submit"] {
+        padding: 12px; /* Mobilde buton içi boşluğu artır */
+    }
+}
