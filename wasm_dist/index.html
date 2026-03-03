@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Museum PDF Tool</title>
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <!-- Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Google Fonts for Modern Look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Base CSS inline for speed -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.05);
+        }
+
+        .input-field {
+            transition: all 0.3s ease;
+            border: 1px solid #e5e7eb;
+            background-color: #f9fafb;
+        }
+
+        .input-field:focus {
+            background-color: #ffffff;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+            outline: none;
+        }
+
+        .gradient-btn {
+            background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .gradient-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3);
+        }
+
+        .progress-bar-container {
+            background-color: rgba(255, 255, 255, 0.2);
+            height: 4px;
+            width: 100%;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: #10b981;
+            transition: width 0.3s ease;
+        }
+
+        /* Custom Scrollbar for Terminal */
+        #logArea::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #logArea::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+
+        #logArea::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 4px;
+        }
+    </style>
+
+    <!-- PDF.js WebAssembly -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';</script>
+
+    <!-- PDF-Lib for modifying PDFs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+
+    <!-- JSZip for compression -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <!-- FileSaver.js for downloading -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+</head>
+
+<body class="min-h-screen py-10 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
+
+    <div class="max-w-3xl w-full glass-panel p-8 rounded-2xl relative overflow-hidden">
+
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight sm:text-4xl">Museum PDF Tool</h1>
+            <p class="mt-2 text-sm text-gray-500 font-medium tracking-wide">
+                <span
+                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mr-2">
+                    <svg class="-ml-0.5 mr-1.5 h-2 w-2 text-green-400" fill="currentColor" viewBox="0 0 8 8">
+                        <circle cx="4" cy="4" r="3" />
+                    </svg>
+                    100% Secure & Offline
+                </span>
+                Files never leave your device. Processed locally via WebAssembly.
+            </p>
+            <a href="guide.html" target="_blank"
+                class="text-indigo-600 hover:text-indigo-800 text-sm font-medium underline mt-2 inline-block transition">
+                📖 Open User Guide
+            </a>
+        </div>
+
+        <form id="uploadForm" class="space-y-6">
+            <!-- File Upload Area -->
+            <div
+                class="bg-gray-50 p-6 rounded-xl border-2 border-dashed border-gray-300 transition hover:border-indigo-400">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Source PDF File</label>
+                <input type="file" id="pdf_file" accept=".pdf" required class="block w-full text-sm text-gray-500
+                              file:mr-4 file:py-2.5 file:px-4
+                              file:rounded-full file:border-0
+                              file:text-sm file:font-semibold
+                              file:bg-indigo-50 file:text-indigo-700
+                              hover:file:bg-indigo-100 transition duration-150 cursor-pointer">
+                <div id="pdfPageCount" class="text-indigo-600 text-sm font-semibold mt-3 flex items-center h-5"></div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Year -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Year</label>
+                    <input type="text" id="year" class="input-field rounded-lg w-full py-2.5 px-4 text-gray-800"
+                        placeholder="e.g. 2024" required>
+                </div>
+                <!-- Number -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Issue Number</label>
+                    <input type="text" id="number" class="input-field rounded-lg w-full py-2.5 px-4 text-gray-800"
+                        placeholder="e.g. 05" required>
+                </div>
+            </div>
+
+            <!-- Configuration Ranges -->
+            <div class="space-y-4 pt-2 border-t border-gray-100">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1 flex justify-between">
+                        Page Ranges to Process
+                        <span class="text-xs text-gray-400 font-normal">e.g. 1-3,4,8-10</span>
+                    </label>
+                    <input type="text" id="article_ranges"
+                        class="input-field rounded-lg w-full py-2.5 px-4 text-gray-800"
+                        placeholder="Leave empty to process all pages">
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1 flex justify-between">
+                            Merge Blocks
+                            <span class="text-xs text-gray-400 font-normal">e.g. 1,3</span>
+                        </label>
+                        <input type="text" id="merge_ranges"
+                            class="input-field rounded-lg w-full py-2 px-3 text-gray-800 text-sm"
+                            placeholder="Merge separated blocks into one">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1 flex justify-between">
+                            Exclude Pages
+                            <span class="text-xs text-gray-400 font-normal">e.g. 5,10,12</span>
+                        </label>
+                        <input type="text" id="remove_pages"
+                            class="input-field rounded-lg w-full py-2 px-3 text-gray-800 text-sm"
+                            placeholder="Pages to permanently delete">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Action -->
+            <div class="pt-4">
+                <button type="submit"
+                    class="gradient-btn w-full text-white font-bold py-3.5 px-4 rounded-xl relative overflow-hidden focus:outline-none focus:ring-4 focus:ring-indigo-200">
+                    <span class="relative z-10 flex items-center justify-center text-lg shadow-sm" id="btn-text">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z">
+                            </path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Process PDF
+                    </span>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" id="progress-bar" style="width: 0%;"></div>
+                    </div>
+                </button>
+            </div>
+        </form>
+
+        <!-- Terminal Output -->
+        <div id="logArea"
+            class="mt-6 p-4 bg-gray-900 border border-gray-800 text-green-400 text-xs rounded-xl hidden h-40 overflow-y-auto font-mono shadow-inner leading-relaxed">
+            <span class="text-gray-500">Museum PDF Tool v2.0 Initialization...</span><br>
+        </div>
+
+        <audio id="notificationSound" src="sound/notification.mp3" preload="auto"></audio>
+
+        <!-- Result Download Menu -->
+        <div id="result" class="mt-6 hidden animate-fade-in-up">
+            <div
+                class="bg-green-50 rounded-xl p-6 border border-green-100 flex flex-col items-center justify-center space-y-4">
+                <div class="flex items-center text-green-700">
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span class="font-semibold text-lg">Processing Complete!</span>
+                </div>
+                <div id="downloadLinks" class="w-full"></div>
+                <p class="text-xs text-green-600 text-center">Process completed safely within your hardware.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <style>
+        .animate-fade-in-up {
+            animation: fadeInUp 0.5s ease-out forwards;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+
+    <!-- Core App Engine -->
+    <script src="js/wasm_engine.js"></script>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then(reg => console.log('[PWA] Service Worker registered. Scope:', reg.scope))
+                    .catch(err => console.log('[PWA] Service Worker registration failed:', err));
+            });
+        }
+    </script>
+</body>
+
+</html>
